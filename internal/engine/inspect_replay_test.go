@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 // Optional, offline reproduction against an operator-supplied saved result.

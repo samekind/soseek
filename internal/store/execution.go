@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func (s *Store) BeginAttempt(ctx context.Context, runID string, a core.Attempt) (core.Attempt, error) {

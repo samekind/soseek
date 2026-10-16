@@ -1,5 +1,7 @@
 # soseek
 
+[Source](https://github.com/samekind/soseek) · [Releases](https://github.com/samekind/soseek/releases)
+
 Search, read, and research from your terminal—with one provider, several providers,
 or a cloud Grok agent that decides what to look up next.
 
@@ -63,8 +65,9 @@ install -m 0755 ./bin/soseek "$HOME/.local/bin/soseek"
 ```
 
 Ensure `$HOME/.local/bin` is on `PATH`, or use `./bin/soseek` directly. Source
-builds are available now. Release archives may not have been published yet;
-check the repository's releases before using [the release installer](scripts/install.sh).
+builds are available now. Prebuilt archives are available from the organization's
+[releases](https://github.com/samekind/soseek/releases) through
+[the release installer](scripts/install.sh).
 The installer downloads an existing release and verifies its checksum; it does
 not build from source or create an account.
 

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
-	"github.com/jstar0/soseek/internal/provider"
+	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/provider"
 )
 
 type memoryStore struct {

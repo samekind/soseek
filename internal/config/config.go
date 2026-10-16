@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func Load(path string) (core.Config, error) {

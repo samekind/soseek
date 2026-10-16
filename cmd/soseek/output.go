@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 // Strip complete CSI and OSC sequences, not merely ESC, so terminal source

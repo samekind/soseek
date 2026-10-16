@@ -12,8 +12,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/jstar0/soseek/internal/core"
-	"github.com/jstar0/soseek/internal/fusion"
+	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/fusion"
 )
 
 type execution struct {

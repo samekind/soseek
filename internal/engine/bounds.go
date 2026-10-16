@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 // boundedCall constrains work-amplifying native parameters before cost

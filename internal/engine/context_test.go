@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func TestReadTargetSurvivesSearchDomainLimitAndBodyBudgetDeduplicates(t *testing.T) {

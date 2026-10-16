@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 	"golang.org/x/net/publicsuffix"
 )
 

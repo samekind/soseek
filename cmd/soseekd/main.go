@@ -13,12 +13,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jstar0/soseek/internal/api"
-	"github.com/jstar0/soseek/internal/config"
-	"github.com/jstar0/soseek/internal/core"
-	"github.com/jstar0/soseek/internal/engine"
-	"github.com/jstar0/soseek/internal/provider"
-	"github.com/jstar0/soseek/internal/store"
+	"github.com/samekind/soseek/internal/api"
+	"github.com/samekind/soseek/internal/config"
+	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/engine"
+	"github.com/samekind/soseek/internal/provider"
+	"github.com/samekind/soseek/internal/store"
 )
 
 func main() {

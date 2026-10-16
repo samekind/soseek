@@ -3,7 +3,7 @@
 set -eu
 install_version=0.1.0
 install_prefix="$HOME/.local/bin"
-install_base=https://github.com/jstar0/soseek/releases/download
+install_base=https://github.com/samekind/soseek/releases/download
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --version) [ "$#" -ge 2 ] || exit 2; install_version=$2; shift 2;;

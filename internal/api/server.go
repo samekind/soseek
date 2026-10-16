@@ -16,10 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
-	"github.com/jstar0/soseek/internal/engine"
-	"github.com/jstar0/soseek/internal/store"
-	"github.com/jstar0/soseek/schemas"
+	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/engine"
+	"github.com/samekind/soseek/internal/store"
+	"github.com/samekind/soseek/schemas"
 )
 
 type Server struct {

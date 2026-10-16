@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jstar0/soseek/internal/client"
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/client"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func setupConfig(t *testing.T, server string) {

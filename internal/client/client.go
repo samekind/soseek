@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 const maxResponse = 32 << 20

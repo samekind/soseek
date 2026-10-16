@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 type schema = map[string]any

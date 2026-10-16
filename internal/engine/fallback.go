@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 // providerChannels returns alternatives only within the selected provider. A

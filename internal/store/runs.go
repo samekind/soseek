@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 const runColumns = `id,principal_id,status,request,plan,principal,revision,budget,created_at,updated_at,deadline,cancel_requested,result,error,expired`

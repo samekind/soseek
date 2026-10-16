@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jstar0/soseek/internal/core"
-	"github.com/jstar0/soseek/internal/fusion"
+	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/fusion"
 )
 
 // This optional replay uses only operator-supplied saved JSON and SSE events.

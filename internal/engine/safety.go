@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 type resolver func(context.Context, string) ([]net.IPAddr, error)

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func TestValidateURL(t *testing.T) {

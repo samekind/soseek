@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func (c *Client) exa(ctx context.Context, ch core.Channel, key, op string, body map[string]any) (core.Output, error) {

@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 func TestCanonicalURLPreservesResourceIdentity(t *testing.T) {

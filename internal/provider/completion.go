@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 // Complete sends exactly the persisted conversation supplied by the executor.

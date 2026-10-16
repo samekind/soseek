@@ -1,4 +1,4 @@
-module github.com/jstar0/soseek
+module github.com/samekind/soseek
 
 go 1.27.1
 

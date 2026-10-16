@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jstar0/soseek/internal/core"
+	"github.com/samekind/soseek/internal/core"
 )
 
 var credentialPattern = regexp.MustCompile(`(?i)(?:bearer\s+[^\s]+|(?:sk-|tvly-|fc-)[A-Za-z0-9_-]{12,})`)
