@@ -16,6 +16,7 @@ import (
 	"github.com/samekind/soseek/internal/api"
 	"github.com/samekind/soseek/internal/config"
 	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/credentials"
 	"github.com/samekind/soseek/internal/engine"
 	"github.com/samekind/soseek/internal/provider"
 	"github.com/samekind/soseek/internal/store"
@@ -29,7 +30,7 @@ func main() {
 }
 func run(args []string) error {
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
-		fmt.Println("soseekd serve|check|backup|admin token-create|admin token-list|admin token-revoke|admin settle --config FILE\n  token-create: --name NAME --daily-usd 5 [--providers exa,tavily]\n  token-revoke: --id PRINCIPAL_ID\n  settle: --attempt ID (--cost-usd AMOUNT | --worst-case)\n  backup: --out PATH\n  All management commands are local; protect token-create stdout.")
+		fmt.Println("soseekd serve|check|backup|admin token-create|admin token-list|admin token-revoke|admin grant|admin settle --config FILE\n  token-create: --name NAME --daily-usd 5 [--providers exa,tavily]\n  token-revoke / grant: --id PRINCIPAL_ID\n  grant: enable management panel access for an existing principal\n  settle: --attempt ID (--cost-usd AMOUNT | --worst-case)\n  backup: --out PATH\n  Protect token-create stdout. Administrators can also manage the service at /admin/.")
 		return nil
 	}
 	if args[0] == "--version" || args[0] == "version" {
@@ -79,6 +80,14 @@ func run(args []string) error {
 	defer db.Close()
 	ctx := context.Background()
 	switch command {
+	case "grant":
+		if *id == "" {
+			return fmt.Errorf("--id required")
+		}
+		if err := db.GrantAdmin(ctx, *id); err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(map[string]any{"principal_id": *id, "admin": true})
 	case "token-create":
 		if *name == "" {
 			return fmt.Errorf("--name required")
@@ -141,8 +150,13 @@ func run(args []string) error {
 		if err = db.Recover(ctx); err != nil {
 			return err
 		}
-		e := engine.New(cfg, db, provider.New())
-		s := api.New(cfg, db, e)
+		vault, err := credentials.New(cfg)
+		if err != nil {
+			return err
+		}
+		defer vault.Close()
+		e := engine.New(cfg, db, provider.NewWithKeyResolver(vault.ReadKey))
+		s := api.New(cfg, db, e).WithCredentials(vault)
 		s.Start(ctx)
 		srv := &http.Server{Addr: cfg.Listen, Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 		go func() {

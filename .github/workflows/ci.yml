@@ -16,6 +16,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - run: corepack enable
+      - name: Build and embed admin UI
+        run: ./scripts/build-web.sh
+      - name: Check admin client safety behavior
+        working-directory: web
+        run: pnpm test
       - run: go test -race ./...
       - run: go vet ./...
       - run: node --test evals/evaluate.test.mjs

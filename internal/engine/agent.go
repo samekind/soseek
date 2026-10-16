@@ -409,6 +409,9 @@ func (e *Engine) availableSearch(p core.Principal) []string {
 		if c.Disabled || !p.Allows(c.Provider) || !has(c.Operations, "search") || has(out, c.Provider) {
 			continue
 		}
+		if e.credentialUnavailable(c) != "" {
+			continue
+		}
 		if _, err := costBound(c, "search"); err == nil {
 			out = append(out, c.Provider)
 		}

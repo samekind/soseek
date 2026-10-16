@@ -23,19 +23,65 @@ import (
 
 const maxResponseBytes = 8 << 20
 
-type Client struct{ http *http.Client }
+type KeyResolver func(core.Channel) (string, error)
+
+type Client struct {
+	http            *http.Client
+	resolveKey      KeyResolver
+	checkCredential bool
+}
 
 func New() *Client { return NewWithHTTP(&http.Client{}) }
+
+// NewWithKeyResolver checks the resolver on every request. A revoked or rotated
+// key takes effect on the next call without recreating the provider client.
+func NewWithKeyResolver(resolver KeyResolver) *Client {
+	return NewWithHTTPAndKeyResolver(&http.Client{}, resolver)
+}
 
 // NewWithHTTP preserves the caller's transport but never forwards authentication
 // across redirects (including same-host redirects to another port).
 func NewWithHTTP(h *http.Client) *Client {
+	return NewWithHTTPAndKeyResolver(h, nil)
+}
+
+func NewWithHTTPAndKeyResolver(h *http.Client, resolver KeyResolver) *Client {
 	if h == nil {
 		h = &http.Client{}
 	}
 	copy := *h
 	copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &Client{http: &copy}
+	customResolver := resolver != nil
+	if resolver == nil {
+		resolver = readKey
+	}
+	return &Client{http: &copy, resolveKey: resolver, checkCredential: customResolver}
+}
+
+// CredentialAvailable checks the managed key reference without contacting the
+// upstream. Legacy clients keep their existing validation behavior.
+func (c *Client) CredentialAvailable(ch core.Channel) bool {
+	if !c.checkCredential {
+		return true
+	}
+	_, err := c.credential(ch)
+	return err == nil
+}
+
+func (c *Client) credential(ch core.Channel) (string, error) {
+	resolver := c.resolveKey
+	if resolver == nil {
+		resolver = readKey
+	}
+	key, err := resolver(ch)
+	if err != nil {
+		return "", core.E("credential_error", "credential is unavailable or disabled")
+	}
+	key = strings.TrimSpace(key)
+	if key == "" || len(key) >= 16<<10 || strings.ContainsAny(key, "\r\n") {
+		return "", core.E("credential_error", "credential is empty or invalid")
+	}
+	return key, nil
 }
 
 var _ core.ProviderClient = (*Client)(nil)
@@ -83,7 +129,7 @@ func (c *Client) Call(ctx context.Context, ch core.Channel, call core.Call) (cor
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	key, err := readKey(ch)
+	key, err := c.credential(ch)
 	if err != nil {
 		return core.Output{}, err
 	}

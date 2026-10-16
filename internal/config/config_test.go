@@ -34,3 +34,18 @@ func TestUnknownConfigFieldsRejected(t *testing.T) {
 		t.Fatal("unknown field ignored")
 	}
 }
+
+func TestTrustedProxyCIDRs(t *testing.T) {
+	c := core.Config{}
+	Defaults(&c)
+	for _, proxy := range []string{"bad", "0.0.0.0/0", "::/0"} {
+		c.TrustedProxies = []string{proxy}
+		if Validate(c) == nil {
+			t.Fatalf("accepted invalid proxy allowlist %q", proxy)
+		}
+	}
+	c.TrustedProxies = []string{"172.30.4.1/32", "fd00::1/128"}
+	if err := Validate(c); err != nil {
+		t.Fatal(err)
+	}
+}

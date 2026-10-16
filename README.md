@@ -45,6 +45,9 @@ flowchart LR
   request and idempotency key.
 - **See the boundaries.** Results include attempts, warnings, sources, and usage.
   Partial results and unresolved charges remain visible.
+- **Manage the service in a browser.** The shadcn/ui console at `/admin/` shows
+  runs, usage and audit history, and manages personal access tokens and upstream
+  credential overrides. Administrator access is granted explicitly on the server.
 
 Provider adapters cover Exa, Tavily, Firecrawl, Serper, and Grok. The actual
 operations, configured channels, limits, and verification status depend on your
@@ -58,6 +61,8 @@ Use **Go 1.27.1 or newer** to build from a source checkout:
 
 ```sh
 go build -trimpath -o ./bin/soseek ./cmd/soseek
+# To include the admin panel in the server, also install Node.js 24+ and pnpm:
+./scripts/build-web.sh
 go build -trimpath -o ./bin/soseekd ./cmd/soseekd
 
 mkdir -p "$HOME/.local/bin"
@@ -183,8 +188,9 @@ the same file. This version does not provide multi-node scheduling or database
 high availability. Users share configured upstream capacity, while task access
 and content caches are scoped to their identities.
 
-Administration is local through `soseekd admin`; there is no public account
-registration, billing portal, or web administration interface. The CLI can
+Administrators can use the [web console](docs/ADMIN.md) or local `soseekd admin`
+commands. The console has no public registration or billing portal. Existing
+caller tokens do not automatically gain administrator privileges. The CLI can
 connect to a local development server or an independently deployed cloud
 instance using the same protocol.
 

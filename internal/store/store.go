@@ -162,6 +162,19 @@ CREATE TABLE IF NOT EXISTS cache (
  principal_id TEXT NOT NULL, key TEXT NOT NULL, data TEXT NOT NULL, expires_at INTEGER NOT NULL,
  PRIMARY KEY(principal_id,key)
 );
+CREATE TABLE IF NOT EXISTS admin_roles (
+ principal_id TEXT PRIMARY KEY REFERENCES principals(id), granted_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_sessions (
+ token_hash TEXT PRIMARY KEY, principal_id TEXT NOT NULL REFERENCES principals(id),
+ created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS admin_sessions_principal ON admin_sessions(principal_id);
+CREATE INDEX IF NOT EXISTS admin_sessions_expiry ON admin_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS admin_audit (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, action TEXT NOT NULL,
+ target TEXT NOT NULL, created_at INTEGER NOT NULL
+);
 PRAGMA user_version=1;
 `
 

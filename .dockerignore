@@ -1,6 +1,8 @@
 .git
 .env*
 **/credentials
+!internal/credentials
+!internal/credentials/**
 **/*.key
 **/*.pem
 **/*.db
@@ -15,4 +17,10 @@ bin
 coverage*
 *.test
 node_modules
+**/node_modules
+web/dist
+web/*.tsbuildinfo
+web/.registry
+internal/adminui/dist/*
+!internal/adminui/dist/placeholder.txt
 tmp

@@ -129,6 +129,16 @@ func Defaults(c *core.Config) {
 	}
 }
 func Validate(c core.Config) error {
+	for _, cidr := range c.TrustedProxies {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("trusted_proxies entries must be CIDR ranges")
+		}
+		bits, _ := network.Mask.Size()
+		if bits == 0 {
+			return fmt.Errorf("trusted_proxies must not trust the entire internet")
+		}
+	}
 	if _, _, err := net.SplitHostPort(c.Listen); err != nil {
 		return fmt.Errorf("listen must be host:port")
 	}

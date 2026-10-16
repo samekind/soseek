@@ -90,9 +90,15 @@ func (e *Engine) routeExclusions(req core.Request, p core.Principal, op string) 
 			continue
 		}
 		reason := ""
+		credentialReason := ""
+		if !c.Disabled {
+			credentialReason = e.credentialUnavailable(c)
+		}
 		switch {
 		case c.Disabled:
 			reason = "disabled by configuration"
+		case credentialReason != "":
+			reason = credentialReason
 		case !has(c.Operations, op):
 			reason = "operation not declared"
 		case !e.implemented(c.Provider, op):

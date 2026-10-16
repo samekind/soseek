@@ -343,6 +343,10 @@ func (e *Engine) route(req core.Request, p core.Principal, op string, broad bool
 				rejected = append(rejected, c.ID+": disabled by configuration")
 				continue
 			}
+			if reason := e.credentialUnavailable(c); reason != "" {
+				rejected = append(rejected, c.ID+": "+reason)
+				continue
+			}
 			if !has(c.Operations, op) {
 				rejected = append(rejected, c.ID+": operation not declared")
 				continue
@@ -411,6 +415,9 @@ func (e *Engine) implemented(provider, op string) bool {
 func (e *Engine) planner(p core.Principal) (core.Channel, error) {
 	for _, c := range e.cfg.Channels {
 		if c.ID == e.cfg.PlannerChannel && !c.Disabled && c.Provider == "grok" && p.Allows(c.Provider) && has(c.Operations, "planner") {
+			if reason := e.credentialUnavailable(c); reason != "" {
+				return c, core.E("planner_unavailable", "Grok planner channel excluded: "+reason)
+			}
 			if reason := e.groupUnavailable(c); reason != "" {
 				return c, core.E("planner_unavailable", "Grok planner channel excluded: "+reason)
 			}
@@ -421,6 +428,15 @@ func (e *Engine) planner(p core.Principal) (core.Channel, error) {
 		}
 	}
 	return core.Channel{}, core.E("planner_unavailable", "Grok planner is not configured or permitted; pipeline must be explicitly requested")
+}
+
+// Resolve availability on every decision so vault disable/restore takes effect
+// without restarting the engine. Legacy clients require no extra key read.
+func (e *Engine) credentialUnavailable(c core.Channel) string {
+	if checker, ok := e.up.(interface{ CredentialAvailable(core.Channel) bool }); ok && !checker.CredentialAvailable(c) {
+		return "referenced credential is unavailable or disabled"
+	}
+	return ""
 }
 func costBound(c core.Channel, op string) (int64, error) {
 	v, ok := c.CostBounds[op]
@@ -466,6 +482,9 @@ func (e *Engine) Capabilities(p core.Principal) any {
 			}
 		}
 		reason := e.groupUnavailable(c)
+		if credentialReason := e.credentialUnavailable(c); credentialReason != "" {
+			reason = credentialReason
+		}
 		cs = append(cs, map[string]any{"id": c.ID, "provider": c.Provider, "declared_operations": ops, "cost_bounds_micros": c.CostBounds, "verified": c.Verified, "available": !c.Disabled && reason == "", "unavailable_reason": reason, "model": c.Model})
 	}
 	_, pe := e.planner(p)

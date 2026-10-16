@@ -27,7 +27,7 @@ func (c *Client) Complete(ctx context.Context, ch core.Channel, messages []core.
 	if maxTokens > 32768 {
 		return core.Completion{}, core.E("invalid_input", "planner max_tokens exceeds 32768")
 	}
-	key, err := readKey(ch)
+	key, err := c.credential(ch)
 	if err != nil {
 		return core.Completion{}, err
 	}

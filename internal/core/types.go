@@ -23,6 +23,7 @@ type Config struct {
 	PlannerChannel string    `json:"planner_channel"`
 	Limits         Limits    `json:"limits"`
 	Revision       string    `json:"-"`
+	TrustedProxies []string  `json:"trusted_proxies,omitempty"`
 }
 type Limits struct {
 	Workers          int   `json:"workers"`

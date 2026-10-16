@@ -3,10 +3,15 @@
 Run one service instance with a persistent local volume. Do not share its SQLite
 file over NFS or start multiple independent executors against the same file.
 The CLI connects over HTTPS and needs only an individual soseek access token.
+The administrator panel is served from the same origin at `/admin/`; its compiled
+assets are embedded in `soseekd`. See [management setup](../docs/ADMIN.md) for
+administrator authorization, sessions and credential persistence.
 
 ## Container
 
-Build requirements: Docker with Compose. The image uses Go 1.27.1 and a non-root
+Build requirements: Docker with Compose. The image builds its UI with Node.js 24
+and pinned pnpm, then compiles Go 1.27.1; its runtime contains no Node.js process.
+It uses a non-root
 UID/GID of `10001`. On a Linux Docker host, run these commands from `deploy/`:
 
 ```sh
@@ -39,6 +44,11 @@ proxy arguments are build-time inputs and are not runtime environment settings.
 
 To use a supplied Linux AMD64 image archive instead of rebuilding on an AMD64
 host, verify its accompanying checksum, load it, then start the configured service:
+
+The historical archive recorded below predates the management panel and supports
+the previously verified CLI/API service. Build the current Dockerfile for the
+panel until a replacement archive has its own UI acceptance record; the version
+tag alone does not prove that the new frontend is embedded.
 
 ```sh
 sha256sum -c soseek_0.1.0_linux_amd64_image.tar.gz.sha256
@@ -78,6 +88,53 @@ file publishes only loopback, caps container logs at roughly 24 MB, and stores
 database data in its named `data` volume. Container deletion does not delete that
 volume; `docker compose down -v` does, so do not use it for routine upgrades.
 
+For the admin panel behind a container proxy, configure `trusted_proxies` with
+the actual proxy source's precise `/32` (IPv4) or `/128` (IPv6) CIDR. A service
+inside Docker may see the bridge gateway or the reverse-proxy container address
+even when the published host port is loopback. Do not assume the gateway address
+or trust an entire subnet. The default trusts only loopback forwarded HTTPS
+headers; an untrusted source cannot establish a remote management session by
+claiming `X-Forwarded-Proto: https`. See [proxy setup](../docs/ADMIN.md#https-反向代理).
+
+## Build the embedded panel
+
+When building native release binaries from source, use Node.js 24 or newer and
+the pnpm version pinned in `web/package.json`:
+
+```sh
+# Run from the repository root.
+./scripts/build-web.sh
+go build -o bin/soseekd ./cmd/soseekd
+```
+
+The script performs a frozen dependency install and TypeScript/Vite build, checks
+the `/admin/` entry assets, and copies `web/dist` into `internal/adminui/dist`.
+Generated assets are ignored by Git; `placeholder.txt` remains tracked so ordinary
+Go checks can run without a frontend toolchain. A binary built with only that
+placeholder returns HTTP 503 at `/admin/` with build instructions. The release
+script and CI always build the real UI first; Docker builds and embeds it in its
+separate frontend stage.
+
+## Authorize the first administrator
+
+Existing caller tokens do not become administrators automatically. After creating
+or choosing a principal, run the local bootstrap command on the server:
+
+```sh
+docker compose exec soseek soseekd admin token-list --config /etc/soseek/config.json
+docker compose exec soseek soseekd admin grant \
+  --config /etc/soseek/config.json --id PRINCIPAL_ID
+```
+
+For native deployments use the same commands without `docker compose exec soseek`,
+as the service user. Then open `/admin/` over HTTPS and enter that principal's
+existing token. The browser receives a 12-hour HttpOnly, SameSite=Strict session
+cookie, marked Secure over HTTPS; it does not persist the access token in browser
+storage or URLs. Administrators can inspect every user's tasks and results and
+manage personal tokens, quotas and existing upstream credential references.
+Ordinary callers retain the original per-principal API isolation. Browser users
+cannot grant administrator roles or add new provider/channel definitions.
+
 ## Native systemd
 
 Install the release binary at `/usr/local/bin/soseekd`; create a dedicated
@@ -110,6 +167,15 @@ return their content from SQLite even when the export files are absent. This
 command does not copy configuration or upstream secrets. Preserve recoverable
 configuration and retain the needed secrets independently in your secret store.
 
+Panel credential changes add private override files under
+`dirname(database)/credentials`, normally `/var/lib/soseek/credentials`, with
+directory mode `0700` and file mode `0600`. This location is in the persistent
+data volume and is separate from the original read-only `/etc/soseek/credentials`
+mount. Preserve it during deployment, binary rollback and restoration; replacing
+the image must not reset overridden keys or disabled-credential markers. Include
+it in a separate protected secret backup: **SQLite snapshots do not contain this
+directory**, and database-only recovery does not restore panel key changes.
+
 For the container, use a private temporary directory on the data volume, then
 copy the completed snapshot out:
 
@@ -126,6 +192,11 @@ WAL, SHM and artifact directory as a rollback set. Install the verified snapshot
 as `soseek.db` with the service UID/GID and mode `0600`; remove stale WAL/SHM only
 after preserving that rollback set. Artifact files are optional derived copies;
 start the service and test authentication, ownership isolation and a real query.
+Restore the matching private credential override directory as well as the original
+configuration/secret references. The reference paths or environment names must
+remain consistent with the deployment being restored. Database snapshots also
+retain administrator roles and session hashes, so review access changes made
+after the snapshot before reopening management access.
 Recovery may mark interrupted upstream attempts uncertain instead of replaying
 possibly billed calls. Restoring an older database also restores older access
 token state: repeat any revocations or quota changes made after the snapshot.
@@ -136,6 +207,11 @@ The recommended initial retention is seven days. Same-host snapshots help with
 operator errors; also copy them to separate protected storage to cover host loss.
 
 ## Container acceptance record
+
+These records predate the embedded management panel. They establish the recorded
+CLI/API image behavior and do not establish the newer `/admin/` flows, frontend
+bundle or credential-overlay recovery; those require a separate updated build
+and acceptance run.
 
 On 2026-10-17 at 00:43 UTC+08:00 the source snapshot below was built and exercised
 on Linux ARM64 via Colima. An isolated Compose project used the service's non-root user,

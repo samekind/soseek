@@ -914,6 +914,1552 @@
           }
         }
       }
+    },
+    "/admin/api/session": {
+      "post": {
+        "summary": "Exchange administrator token for management cookie",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Exchange administrator token for management cookie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "soseek_admin_session; Path=/admin/api; HttpOnly; SameSite=Strict; Max-Age=43200; Secure when HTTPS is used.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid, revoked, or non-administrator API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Login rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Exchanges an existing administrator API bearer token for a 12-hour cookie session. The input token is never returned. The response sets an HttpOnly SameSite=Strict cookie (Secure on HTTPS); mutations require exact Origin and X-Soseek-Admin: 1.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionLogin"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      },
+      "get": {
+        "summary": "Current authenticated administrator",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authenticated administrator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "principal": {
+                      "$ref": "#/components/schemas/Principal"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "principal"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Log out and invalidate current session",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log out and invalidate current session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Expires the soseek_admin_session cookie and invalidates the server-side session.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      }
+    },
+    "/admin/api/overview": {
+      "get": {
+        "summary": "Management overview, global usage and configured channels",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Management overview, global usage and configured channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/principals": {
+      "get": {
+        "summary": "List caller principals, including admin and revoked state",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List caller principals, including admin and revoked state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPrincipalList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a caller principal; plaintext API token is returned once and is not recoverable later",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Create a caller principal; plaintext API token is returned once and is not recoverable later",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid principal name, budget, or provider list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrincipalInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      }
+    },
+    "/admin/api/principals/{id}": {
+      "patch": {
+        "summary": "Update principal name, daily budget and provider allowlist",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update principal name, daily budget and provider allowlist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid principal data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Principal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrincipalInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Revoke principal and cancel queued/running tasks; self-revocation and revoking the last active administrator are rejected",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoke principal and cancel queued/running tasks; self-revocation and revoking the last active administrator are rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Principal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Self-revocation or last active administrator revocation is forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ],
+        "description": "Revokes the principal, invalidates its sessions, and requests cancellation of its queued/running tasks. Self-revocation and revocation of the last active administrator are rejected."
+      }
+    },
+    "/admin/api/principals/{id}/rotate": {
+      "post": {
+        "summary": "Rotate caller API token; old token is revoked and new plaintext token is returned once. Rotating the current administrator is rejected.",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rotate caller API token; old token is revoked and new plaintext token is returned once. Rotating the current administrator is rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrincipalTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Principal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Current administrator cannot be rotated from this session; revoked principal cannot rotate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ],
+        "description": "Rotates a non-revoked principal API token, invalidating its old token and sessions. The new plaintext token is returned once. Rotation of the current administrator is rejected to prevent panel lockout; use the local CLI for self-rotation."
+      }
+    },
+    "/admin/api/credentials": {
+      "get": {
+        "summary": "List credential reference metadata without secrets",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List credential reference metadata without secrets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminCredential"
+                      }
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Credential management unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/api/credentials/{id}": {
+      "put": {
+        "summary": "Set credential override for all channels sharing this configured reference; key is never returned",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Set credential override for all channels sharing this configured reference; key is never returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid credential or audit target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Credential reference not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Credential management unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "key"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Reset override and restore configured file or environment reference",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reset override and restore configured file or environment reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid audit target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Credential reference not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Credential management unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      }
+    },
+    "/admin/api/credentials/{id}/disable": {
+      "post": {
+        "summary": "Disable configured credential without falling back to original reference",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disable configured credential without falling back to original reference",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid audit target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Credential reference not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Credential management unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      }
+    },
+    "/admin/api/runs": {
+      "get": {
+        "summary": "List runs across principals; query is truncated at 240 runes",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List runs across principals; query is truncated at 240 runes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRunPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pagination cursor or limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque continuation cursor from next_cursor."
+          }
+        ]
+      }
+    },
+    "/admin/api/runs/{id}": {
+      "get": {
+        "summary": "Read a run across principals",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read a run across principals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Run payload expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/api/runs/{id}/cancel": {
+      "post": {
+        "summary": "Request cancellation for a run owned by any principal",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Request cancellation for a run owned by any principal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OKResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid audit target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Run payload expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "Must exactly match the request origin (scheme and host, with no path)."
+          },
+          {
+            "in": "header",
+            "name": "X-Soseek-Admin",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            },
+            "description": "Required on every state-changing management request, including login."
+          }
+        ]
+      }
+    },
+    "/admin/api/audit": {
+      "get": {
+        "summary": "List administrator audit entries, newest first",
+        "security": [
+          {
+            "cookieAdmin": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List administrator audit entries, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pagination cursor or limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, expired, or revoked management session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Management request must use HTTPS and satisfy exact-origin CSRF checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Decimal ID cursor from next_cursor."
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -921,6 +2467,12 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer"
+      },
+      "cookieAdmin": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "soseek_admin_session",
+        "description": "12-hour HttpOnly SameSite=Strict management session, Secure when HTTPS is used. This cookie is accepted only by /admin/api routes; it does not authenticate /v1 endpoints."
       }
     },
     "schemas": {
@@ -1691,6 +3243,545 @@
         "type": "object",
         "description": "JSON payload for a persisted event. Its fields vary by event name.",
         "additionalProperties": true
+      },
+      "Principal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "daily_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "allowed_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "daily_micros"
+        ]
+      },
+      "AdminPrincipal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "daily_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "allowed_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "admin": {
+            "type": "boolean"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "daily_micros",
+          "admin",
+          "revoked"
+        ]
+      },
+      "PrincipalInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "daily_usd": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]{1,6})?$"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional provider allowlist. Omitted or empty means all configured providers."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "daily_usd"
+        ]
+      },
+      "AdminCredential": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^cred_[a-f0-9]{64}$"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "file",
+              "environment"
+            ]
+          },
+          "configured": {
+            "type": "boolean",
+            "description": "Whether a usable key exists, independently of disabled."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Disabled references fail closed and do not fall back to the configured source."
+          },
+          "overridden": {
+            "type": "boolean",
+            "description": "Whether a persistent panel override exists; reset restores the configured file/environment source."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "channels",
+          "providers",
+          "source",
+          "configured",
+          "disabled",
+          "overridden"
+        ]
+      },
+      "AdminUsage": {
+        "type": "object",
+        "properties": {
+          "reported_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "estimated_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reported_micros",
+          "estimated_micros",
+          "reserved_micros"
+        ]
+      },
+      "AdminStatistics": {
+        "type": "object",
+        "properties": {
+          "today_runs": {
+            "type": "integer"
+          },
+          "active_runs": {
+            "type": "integer"
+          },
+          "queued_runs": {
+            "type": "integer"
+          },
+          "succeeded_runs": {
+            "type": "integer"
+          },
+          "failed_runs": {
+            "type": "integer"
+          },
+          "partial_runs": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "today_runs",
+          "active_runs",
+          "queued_runs",
+          "succeeded_runs",
+          "failed_runs",
+          "partial_runs"
+        ]
+      },
+      "AdminChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "model": {
+            "type": "string"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "quota_group": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "provider",
+          "operations",
+          "disabled",
+          "quota_group"
+        ]
+      },
+      "AdminOverview": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/Limits"
+          },
+          "statistics": {
+            "$ref": "#/components/schemas/AdminStatistics"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AdminUsage"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminChannel"
+            }
+          },
+          "principal": {
+            "$ref": "#/components/schemas/Principal"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "revision",
+          "limits",
+          "statistics",
+          "usage",
+          "channels",
+          "principal"
+        ]
+      },
+      "AdminPrincipalList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPrincipal"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ]
+      },
+      "PrincipalTokenResponse": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "$ref": "#/components/schemas/AdminPrincipal"
+          },
+          "token": {
+            "type": "string",
+            "description": "Plaintext caller API token returned only at creation or rotation; store it now because it cannot be retrieved again."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "principal",
+          "token"
+        ]
+      },
+      "PrincipalResponse": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "$ref": "#/components/schemas/AdminPrincipal"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "principal"
+        ]
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "$ref": "#/components/schemas/Principal"
+          },
+          "expires_in": {
+            "type": "integer",
+            "const": 43200,
+            "description": "Fixed 12-hour, non-sliding session lifetime in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "principal",
+          "expires_in"
+        ]
+      },
+      "SessionLogin": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 512
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ]
+      },
+      "OKResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ]
+      },
+      "AdminRunSummary": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "principal_id": {
+            "type": "string"
+          },
+          "principal_name": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AdminUsage"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "query_truncated": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "principal_id",
+          "principal_name",
+          "operation",
+          "status",
+          "created_at",
+          "updated_at",
+          "usage",
+          "expired"
+        ]
+      },
+      "AdminRunPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRunSummary"
+            }
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "actor_name": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "actor_id",
+          "actor_name",
+          "action",
+          "target",
+          "created_at"
+        ]
+      },
+      "AuditPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            }
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ]
+      },
+      "Limits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workers",
+          "queue",
+          "daily_micros",
+          "default_run_micros",
+          "max_run_micros",
+          "max_calls",
+          "max_rounds",
+          "max_pages",
+          "max_chars",
+          "max_deadline_seconds",
+          "retention_days",
+          "cache_seconds"
+        ],
+        "properties": {
+          "workers": {
+            "type": "integer"
+          },
+          "queue": {
+            "type": "integer"
+          },
+          "daily_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "default_run_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "max_run_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "max_calls": {
+            "type": "integer"
+          },
+          "max_rounds": {
+            "type": "integer"
+          },
+          "max_pages": {
+            "type": "integer"
+          },
+          "max_chars": {
+            "type": "integer"
+          },
+          "max_deadline_seconds": {
+            "type": "integer"
+          },
+          "retention_days": {
+            "type": "integer"
+          },
+          "cache_seconds": {
+            "type": "integer"
+          }
+        }
       }
     }
   }

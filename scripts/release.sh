@@ -4,13 +4,14 @@ set -eu
 
 release_version=${1:-0.1.0}
 case "$release_version" in *[!A-Za-z0-9._-]*|'') echo 'Invalid version' >&2; exit 2;; esac
-release_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+release_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 release_out=${SOSEEK_RELEASE_DIR:-"$release_root/dist"}
 mkdir -p "$release_out"
-release_out=$(CDPATH= cd -- "$release_out" && pwd)
+release_out=$(CDPATH='' cd -- "$release_out" && pwd)
 release_tmp=$(mktemp -d "${TMPDIR:-/tmp}/soseek-release.XXXXXX")
 trap 'rm -rf "$release_tmp"' EXIT HUP INT TERM
 cd "$release_root"
+./scripts/build-web.sh
 
 for release_target in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/arm64 windows/amd64; do
     release_os=${release_target%/*}

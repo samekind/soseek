@@ -17,16 +17,21 @@ import (
 	"time"
 
 	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/credentials"
 	"github.com/samekind/soseek/internal/engine"
 	"github.com/samekind/soseek/internal/store"
 	"github.com/samekind/soseek/schemas"
 )
 
 type Server struct {
-	cfg    core.Config
-	db     *store.Store
-	engine *engine.Engine
-	wg     sync.WaitGroup
+	cfg         core.Config
+	db          *store.Store
+	engine      *engine.Engine
+	wg          sync.WaitGroup
+	credentials *credentials.Manager
+	loginMu     sync.Mutex
+	loginWindow time.Time
+	loginCount  int
 }
 
 func New(cfg core.Config, db *store.Store, e *engine.Engine) *Server {
@@ -40,6 +45,7 @@ func principal(r *http.Request) core.Principal {
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	s.registerAdmin(mux)
 	mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		b, _ := schemas.Files.ReadFile("openapi.json")
 		w.Header().Set("Content-Type", "application/json")

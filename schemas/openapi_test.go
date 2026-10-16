@@ -95,3 +95,105 @@ func TestOpenAPIResponseContractsAreCompleteAndResolvable(t *testing.T) {
 	}
 	walk(doc, "openapi")
 }
+
+func TestAdminContractUsesCookieSessionAndMutationCSRFHeaders(t *testing.T) {
+	b, err := Files.ReadFile("openapi.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatal(err)
+	}
+	paths := doc["paths"].(map[string]any)
+	adminPaths := []string{
+		"/admin/api/session", "/admin/api/overview", "/admin/api/principals",
+		"/admin/api/principals/{id}", "/admin/api/principals/{id}/rotate",
+		"/admin/api/credentials", "/admin/api/credentials/{id}",
+		"/admin/api/credentials/{id}/disable", "/admin/api/runs",
+		"/admin/api/runs/{id}", "/admin/api/runs/{id}/cancel", "/admin/api/audit",
+	}
+	for _, path := range adminPaths {
+		item, ok := paths[path].(map[string]any)
+		if !ok {
+			t.Errorf("missing admin path %s", path)
+			continue
+		}
+		for method, raw := range item {
+			op, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			security, _ := op["security"].([]any)
+			login := path == "/admin/api/session" && method == "post"
+			if login {
+				if len(security) != 0 {
+					t.Errorf("login must exchange a bearer token in its body, not require a cookie: security=%v", security)
+				}
+			} else if len(security) != 1 || !hasSecurityScheme(security, "cookieAdmin") || hasSecurityScheme(security, "bearerAuth") {
+				t.Errorf("%s %s must be cookieAdmin-only, got %v", method, path, security)
+			}
+			if method == "get" {
+				continue
+			}
+			params, _ := op["parameters"].([]any)
+			if !hasRequiredHeader(params, "Origin") || !hasRequiredHeader(params, "X-Soseek-Admin") {
+				t.Errorf("%s %s must require Origin and X-Soseek-Admin on mutations", method, path)
+			}
+		}
+	}
+	for path, itemRaw := range paths {
+		if !strings.HasPrefix(path, "/v1/") {
+			continue
+		}
+		item := itemRaw.(map[string]any)
+		for method, opRaw := range item {
+			op, ok := opRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			security, _ := op["security"].([]any)
+			if len(security) != 1 || !hasSecurityScheme(security, "bearerAuth") || hasSecurityScheme(security, "cookieAdmin") {
+				t.Errorf("caller API %s %s must retain bearer-only security, got %v", method, path, security)
+			}
+		}
+	}
+	cookie := doc["components"].(map[string]any)["securitySchemes"].(map[string]any)["cookieAdmin"].(map[string]any)
+	if cookie["type"] != "apiKey" || cookie["in"] != "cookie" || cookie["name"] != "soseek_admin_session" {
+		t.Errorf("unexpected management cookie security definition: %v", cookie)
+	}
+	if doc["security"] != nil {
+		t.Error("OpenAPI must not declare global auth that could make login require a cookie or alter caller auth")
+	}
+	login := paths["/admin/api/session"].(map[string]any)["post"].(map[string]any)
+	loginResponse := login["responses"].(map[string]any)["200"].(map[string]any)
+	if _, ok := loginResponse["headers"].(map[string]any)["Set-Cookie"]; !ok {
+		t.Error("successful login must document the session Set-Cookie header")
+	}
+	rotate := paths["/admin/api/principals/{id}/rotate"].(map[string]any)["post"].(map[string]any)
+	if !strings.Contains(rotate["description"].(string), "returned once") || !strings.Contains(rotate["description"].(string), "current administrator") {
+		t.Error("rotation must document one-time plaintext and self-rotation lockout")
+	}
+}
+
+func hasSecurityScheme(security []any, name string) bool {
+	for _, raw := range security {
+		requirements, ok := raw.(map[string]any)
+		if ok {
+			if _, exists := requirements[name]; exists {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasRequiredHeader(parameters []any, name string) bool {
+	for _, raw := range parameters {
+		parameter, ok := raw.(map[string]any)
+		if ok && parameter["in"] == "header" && parameter["name"] == name && parameter["required"] == true {
+			return true
+		}
+	}
+	return false
+}

@@ -10,3 +10,9 @@
 *.local.json
 coverage.out
 .DS_Store
+/web/node_modules/
+/web/dist/
+/web/*.tsbuildinfo
+/web/.registry/
+/internal/adminui/dist/*
+!/internal/adminui/dist/placeholder.txt

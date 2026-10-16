@@ -1,0 +1,1 @@
+Run scripts/build-web.sh before building a server for deployment.
