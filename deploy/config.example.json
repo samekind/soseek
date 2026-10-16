@@ -1,0 +1,49 @@
+{
+  "listen": "0.0.0.0:8080",
+  "database": "/var/lib/soseek/soseek.db",
+  "artifact_dir": "/var/lib/soseek/artifacts",
+  "search_order": ["exa"],
+  "read_order": ["exa"],
+  "planner_channel": "grok-official",
+  "limits": {
+    "workers": 2,
+    "queue": 32,
+    "daily_micros": 10000000,
+    "default_run_micros": 500000,
+    "max_run_micros": 1000000,
+    "max_calls": 12,
+    "max_rounds": 6,
+    "max_pages": 5,
+    "max_chars": 12000,
+    "max_deadline_seconds": 300,
+    "retention_days": 7,
+    "cache_seconds": 900
+  },
+  "channels": [
+    {
+      "id": "exa-official",
+      "provider": "exa",
+      "base_url": "https://api.exa.ai",
+      "key_file": "/etc/soseek/credentials/exa.key",
+      "quota_group": "exa-official",
+      "rpm": 10,
+      "concurrency": 2,
+      "timeout_seconds": 40,
+      "operations": ["search", "read"],
+      "cost_bounds_micros": {"search": 50000, "read": 50000}
+    },
+    {
+      "id": "grok-official",
+      "provider": "grok",
+      "base_url": "https://api.x.ai/v1",
+      "key_file": "/etc/soseek/credentials/grok.key",
+      "model": "REPLACE_WITH_VERIFIED_MODEL",
+      "quota_group": "grok-official",
+      "rpm": 10,
+      "concurrency": 1,
+      "timeout_seconds": 90,
+      "operations": ["search", "planner"],
+      "cost_bounds_micros": {"search": 100000, "planner": 100000}
+    }
+  ]
+}

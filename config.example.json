@@ -1,0 +1,35 @@
+{
+  "listen": "127.0.0.1:18570",
+  "database": "data/soseek.db",
+  "artifact_dir": "data/artifacts",
+  "search_order": ["exa", "tavily"],
+  "read_order": ["firecrawl", "tavily", "exa"],
+  "limits": {
+    "workers": 2,
+    "queue": 20,
+    "daily_micros": 10000000,
+    "default_run_micros": 1000000,
+    "max_run_micros": 2000000,
+    "max_calls": 12,
+    "max_rounds": 6,
+    "max_pages": 6,
+    "max_chars": 60000,
+    "max_deadline_seconds": 180,
+    "retention_days": 7,
+    "cache_seconds": 300
+  },
+  "channels": [
+    {
+      "id": "exa-direct",
+      "provider": "exa",
+      "base_url": "https://api.exa.ai",
+      "key_env": "EXA_API_KEY",
+      "quota_group": "exa-account",
+      "rpm": 10,
+      "concurrency": 2,
+      "timeout_seconds": 30,
+      "operations": ["search", "read"],
+      "cost_bounds_micros": {"search": 50000, "read": 50000}
+    }
+  ]
+}

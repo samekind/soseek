@@ -1,0 +1,35 @@
+services:
+  soseek:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: ${SOSEEK_IMAGE:-soseek:0.1.0}
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./config.json:/etc/soseek/config.json:ro
+      - ./credentials:/etc/soseek/credentials:ro
+      - data:/var/lib/soseek
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "8m"
+        max-file: "3"
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8080/readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+volumes:
+  data:

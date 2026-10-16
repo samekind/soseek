@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "soseek Run Request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "operation": {
+      "type": "string",
+      "pattern": "^(search|read|research|answer|[a-z]+\\.[a-z_]+)$"
+    },
+    "query": {
+      "type": "string",
+      "maxLength": 16000
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "providers": {
+      "type": "array",
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "channel": {
+      "type": "string"
+    },
+    "intent": {
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "quick",
+        "broad",
+        "deep"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "agent",
+        "pipeline"
+      ]
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50
+    },
+    "budget_usd": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]{1,6})?$"
+    },
+    "deadline_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1800
+    },
+    "options": {
+      "type": "object"
+    },
+    "input": {
+      "type": "object"
+    },
+    "fresh": {
+      "type": "boolean"
+    }
+  }
+}

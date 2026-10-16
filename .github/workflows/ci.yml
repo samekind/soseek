@@ -1,0 +1,23 @@
+name: checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: go test -race ./...
+      - run: go vet ./...
+      - run: node --test evals/evaluate.test.mjs
+      - run: go run ./cmd/soseekd check --config deploy/config.example.json
+      - run: docker build -t soseek:ci .
