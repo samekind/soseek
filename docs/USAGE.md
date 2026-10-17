@@ -24,6 +24,22 @@ Interactive token input is hidden. `--token-stdin` accepts a token from a pipe;
 avoid placing its literal value in shell history. Unix token files require mode
 `0600`. `doctor` checks authenticated API access without calling paid providers.
 
+The default `environment` connection honors `HTTP_PROXY`, `HTTPS_PROXY`, and
+`NO_PROXY`. An `EOF` or TLS error can come from that proxy path; it does not by
+itself prove the cloud service is down. To compare without submitting paid work,
+run `SOSEEK_CONNECTION=direct soseek doctor --json`. If direct access is intended,
+save it with:
+
+```sh
+soseek auth login --server https://soseek.example.com --token-file /private/token --connection direct
+```
+
+The token remains the same. `doctor` reports the effective connection mode.
+`SOSEEK_CONNECTION=environment` overrides a saved direct setting for one process.
+The CLI never automatically switches paths and resubmits a failed request.
+After fixing connectivity, recover an existing submission with its original
+`pending resume` ID instead of starting another search.
+
 Discovery separates implemented operations from configured channels and their
 verification state. Results are cached per server and identity for five minutes;
 `--fresh` refreshes them. `doctor` and `usage` always query the server. Only use

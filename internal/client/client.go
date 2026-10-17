@@ -22,9 +22,10 @@ import (
 const maxResponse = 32 << 20
 
 type Client struct {
-	BaseURL string
-	Token   string
-	HTTP    *http.Client
+	BaseURL    string
+	Token      string
+	HTTP       *http.Client
+	Connection string
 }
 
 type APIError struct {
@@ -50,6 +51,18 @@ func ValidateURL(raw string) (string, error) {
 }
 
 func New(server, token string) (*Client, error) {
+	return NewWithConnection(server, token, "environment")
+}
+
+// NewWithConnection makes proxy bypass explicit and scoped to this client.
+// Transport failures never trigger a silent retry over another connection path.
+func NewWithConnection(server, token, connection string) (*Client, error) {
+	if connection == "" {
+		connection = "environment"
+	}
+	if connection != "environment" && connection != "direct" {
+		return nil, errors.New("connection must be environment or direct")
+	}
 	base, err := ValidateURL(server)
 	if err != nil {
 		return nil, err
@@ -58,8 +71,13 @@ func New(server, token string) (*Client, error) {
 	if token == "" || strings.ContainsAny(token, "\r\n\x00") {
 		return nil, errors.New("an access token is required")
 	}
-	return &Client{BaseURL: base, Token: token, HTTP: &http.Client{
-		Timeout: 30 * time.Second,
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if connection == "direct" {
+		transport.Proxy = nil
+	}
+	return &Client{BaseURL: base, Token: token, Connection: connection, HTTP: &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
 		// Even same-origin redirects can change POST semantics. No redirect is
 		// followed, so Authorization can never cross an origin boundary.
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -90,7 +108,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any, hea
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("cloud request failed: %w", err)
+		return nil, fmt.Errorf("cloud request failed (connection=%s): %w", c.Connection, err)
 	}
 	if (resp.StatusCode < 200 || resp.StatusCode >= 300) && resp.StatusCode != http.StatusNotModified {
 		defer resp.Body.Close()

@@ -342,3 +342,28 @@ func TestDiscoveryArrayWrappedAsOneObject(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestLoginPersistsExplicitConnectionAndDoctorReportsIt(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/capabilities" {
+			t.Errorf("unexpected request path: %s", r.URL.Path)
+		}
+		fmt.Fprint(w, `{"schema_version":"1.0"}`)
+	}))
+	defer server.Close()
+	setupConfig(t, server.URL)
+	t.Setenv("SOSEEK_CONNECTION", "")
+	dir, _ := client.ConfigDir()
+	code, out, _ := invoke(t, "auth", "login", "--server", server.URL, "--token-file", filepath.Join(dir, "client-token"), "--connection", "direct", "--json")
+	if code != 0 {
+		t.Fatalf("login %d: %s", code, out)
+	}
+	cfg, err := client.LoadConfig()
+	if err != nil || cfg.Connection != "direct" {
+		t.Fatalf("connection not saved: %v", err)
+	}
+	code, out, _ = invoke(t, "doctor", "--json")
+	if code != 0 || oneObject(t, out)["connection"] != "direct" {
+		t.Fatalf("doctor %d: %s", code, out)
+	}
+}

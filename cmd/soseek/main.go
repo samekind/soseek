@@ -138,12 +138,13 @@ func (a *app) flagset(name string) *flag.FlagSet {
 
 func (a *app) auth(ctx context.Context, args []string) (int, error) {
 	if len(args) == 0 {
-		return 2, inputError("usage: soseek auth login --server URL [--token-file FILE | --token-stdin] | logout")
+		return 2, inputError("usage: soseek auth login --server URL [--token-file FILE | --token-stdin] [--connection environment|direct] | logout")
 	}
 	fs := a.flagset("auth " + args[0])
 	server := fs.String("server", "", "HTTPS cloud URL (HTTP allowed for loopback)")
 	tokenFile := fs.String("token-file", "", "read access token from a private file")
 	stdin := fs.Bool("token-stdin", false, "read access token from stdin")
+	connection := fs.String("connection", "environment", "connection path: environment (proxy variables) or direct")
 	fs.BoolVar(&a.json, "json", a.json, "output one JSON object")
 	if err := parseFlags(fs, args[1:]); err != nil {
 		return 2, err
@@ -190,7 +191,7 @@ func (a *app) auth(ctx context.Context, args []string) (int, error) {
 	if len(token) > 16384 {
 		return 2, inputError("access token is too long")
 	}
-	c, err := client.New(*server, string(token))
+	c, err := client.NewWithConnection(*server, string(token), *connection)
 	if err != nil {
 		return 2, inputError(err.Error())
 	}
@@ -203,10 +204,10 @@ func (a *app) auth(ctx context.Context, args []string) (int, error) {
 	if err = client.WriteSecret(path, []byte(c.Token+"\n")); err != nil {
 		return 4, err
 	}
-	if err = client.WritePrivate(filepath.Join(dir, "client.json"), client.Config{Server: c.BaseURL, TokenFile: path}); err != nil {
+	if err = client.WritePrivate(filepath.Join(dir, "client.json"), client.Config{Server: c.BaseURL, TokenFile: path, Connection: c.Connection}); err != nil {
 		return 4, err
 	}
-	return 0, a.print(map[string]any{"status": "authenticated", "server": c.BaseURL}, "Authenticated to "+c.BaseURL)
+	return 0, a.print(map[string]any{"status": "authenticated", "server": c.BaseURL, "connection": c.Connection}, "Authenticated to "+c.BaseURL+" (connection="+c.Connection+")")
 }
 
 func (a *app) discovery(ctx context.Context, command string, args []string) (int, error) {
@@ -242,7 +243,7 @@ func (a *app) discovery(ctx context.Context, command string, args []string) (int
 		return 4, err
 	}
 	if command == "doctor" {
-		out = map[string]any{"status": "ok", "server": c.BaseURL, "checks": map[string]string{"authenticated_api": "passed", "upstream_calls": "not_performed"}, "capabilities": out}
+		out = map[string]any{"status": "ok", "server": c.BaseURL, "connection": c.Connection, "checks": map[string]string{"authenticated_api": "passed", "upstream_calls": "not_performed"}, "capabilities": out}
 	}
 	if _, isObject := out.(map[string]any); !isObject {
 		out = map[string]any{command: out}
@@ -531,7 +532,7 @@ func errorCode(err error) int {
 const helpText = `soseek — Search, read, and research through your cloud service.
 
 Usage:
-  soseek auth login --server URL [--token-file FILE | --token-stdin]
+  soseek auth login --server URL [--token-file FILE | --token-stdin] [--connection environment|direct]
   soseek auth logout
   soseek search "QUERY" [--provider NAME | --providers A,B] [--json]
   soseek read URL [--provider NAME] [--json]
@@ -561,6 +562,8 @@ Execution options:
 Ctrl-C stops local waiting. Use runs cancel to stop the cloud task explicitly.
 Submission failures preserve their original request and idempotency key for
 24 hours; pending resume reuses both. Tokens and pending bodies are private.
-SOSEEK_URL and SOSEEK_TOKEN_FILE override the saved client configuration.
+SOSEEK_URL, SOSEEK_TOKEN_FILE and SOSEEK_CONNECTION override saved configuration.
+Connection defaults to environment (HTTP_PROXY/HTTPS_PROXY/NO_PROXY).
+Use auth login --connection direct to save an explicit direct connection.
 Exit codes: 0 success/partial, 2 input, 3 auth, 4 failure, 5 wait ended, 6 cancelled.
 `

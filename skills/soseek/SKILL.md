@@ -7,6 +7,8 @@ description: Search the web, read public pages, use Grok native search, or deleg
 
 Use the installed `soseek` CLI. It calls the configured cloud service; upstream credentials and execution stay on that service. `soseek doctor --json` checks authenticated access without paid upstream calls. If setup is missing, obtain the service URL and a personal access token through the user's established setup process; `soseek auth login --help` describes secure input. Keep tokens out of command arguments and task output; use interactive entry, `--token-file`, or stdin.
 
+For EOF/TLS connection errors, distinguish the configured proxy path from the cloud service. `doctor` reports `connection`; its default `environment` follows HTTP proxy variables. Where direct access is permitted, `SOSEEK_CONNECTION=direct soseek doctor --json` provides a read-only comparison. An explicit `auth login --connection direct` saves that choice. Recover the original pending submission after connectivity is fixed; a failed doctor check is not a reason to submit a new paid search.
+
 ## Choose the work
 
 - Already know what to look for: use `search`, then `read` for promising URLs. Use project context to choose queries and check whether the sources answer the question.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -203,5 +204,92 @@ func TestDiscoveryCacheIsScopedAndRevalidated(t *testing.T) {
 	}
 	if calls != 4 {
 		t.Fatal("explicit fresh did not bypass cache")
+	}
+}
+
+func TestDirectConnectionBypassesOnlyItsOwnProxy(t *testing.T) {
+	var upstreamCalls, proxyCalls int
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls++
+		if r.Header.Get("Authorization") != "Bearer fixture-token" {
+			t.Error("missing token")
+		}
+		fmt.Fprint(w, `{"status":"ok"}`)
+	}))
+	defer upstream.Close()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyCalls++
+		http.Error(w, "unavailable proxy", http.StatusBadGateway)
+	}))
+	defer proxy.Close()
+	original := http.DefaultTransport
+	transport := original.(*http.Transport).Clone()
+	proxyURL, _ := url.Parse(proxy.URL)
+	transport.Proxy = http.ProxyURL(proxyURL)
+	http.DefaultTransport = transport
+	t.Cleanup(func() { http.DefaultTransport = original; transport.CloseIdleConnections() })
+	viaProxy, err := New(upstream.URL, "fixture-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]string
+	if err = viaProxy.Do(context.Background(), "GET", "/v1/capabilities", nil, &result, nil); err == nil {
+		t.Fatal("broken proxy unexpectedly succeeded")
+	}
+	if upstreamCalls != 0 || proxyCalls != 1 {
+		t.Fatal("environment mode silently fell back to direct")
+	}
+	direct, err := NewWithConnection(upstream.URL, "fixture-token", "direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = direct.Do(context.Background(), "GET", "/v1/capabilities", nil, &result, nil); err != nil {
+		t.Fatal(err)
+	}
+	if upstreamCalls != 1 || proxyCalls != 1 || result["status"] != "ok" {
+		t.Fatal("explicit direct request did not reach origin")
+	}
+	if transport.Proxy == nil {
+		t.Fatal("changed shared default transport")
+	}
+	if _, err = NewWithConnection(upstream.URL, "fixture-token", "automatic"); err == nil {
+		t.Fatal("unknown connection mode accepted")
+	}
+}
+
+func TestConnectionConfigurationAndEnvironmentOverride(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("SOSEEK_URL", "")
+	t.Setenv("SOSEEK_TOKEN_FILE", "")
+	t.Setenv("SOSEEK_CONNECTION", "")
+	dir, _ := ConfigDir()
+	token := filepath.Join(dir, "token")
+	if err := WriteSecret(token, []byte("fixture-token")); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{Server: "https://example.org", TokenFile: token}
+	if err := WritePrivate(filepath.Join(dir, "client.json"), cfg); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load()
+	if err != nil || c.Connection != "environment" {
+		t.Fatalf("old config compatibility: %v", err)
+	}
+	cfg.Connection = "direct"
+	if err = WritePrivate(filepath.Join(dir, "client.json"), cfg); err != nil {
+		t.Fatal(err)
+	}
+	c, err = Load()
+	if err != nil || c.Connection != "direct" || c.HTTP.Transport.(*http.Transport).Proxy != nil {
+		t.Fatalf("saved direct connection: %v", err)
+	}
+	t.Setenv("SOSEEK_CONNECTION", "environment")
+	c, err = Load()
+	if err != nil || c.Connection != "environment" {
+		t.Fatalf("override: %v", err)
+	}
+	t.Setenv("SOSEEK_CONNECTION", "invalid")
+	if _, err = Load(); err == nil {
+		t.Fatal("invalid override accepted")
 	}
 }

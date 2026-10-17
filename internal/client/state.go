@@ -18,8 +18,9 @@ import (
 )
 
 type Config struct {
-	Server    string `json:"server"`
-	TokenFile string `json:"token_file"`
+	Server     string `json:"server"`
+	TokenFile  string `json:"token_file"`
+	Connection string `json:"connection,omitempty"`
 }
 type Pending struct {
 	ID        string        `json:"idempotency_key"`
@@ -126,6 +127,9 @@ func LoadConfig() (Config, error) {
 	if v := os.Getenv("SOSEEK_TOKEN_FILE"); v != "" {
 		cfg.TokenFile = v
 	}
+	if v := os.Getenv("SOSEEK_CONNECTION"); v != "" {
+		cfg.Connection = v
+	}
 	return cfg, nil
 }
 func Load() (*Client, error) {
@@ -140,7 +144,7 @@ func Load() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(cfg.Server, string(b))
+	return NewWithConnection(cfg.Server, string(b), cfg.Connection)
 }
 func Identity(token string) string {
 	sum := sha256.Sum256([]byte(token))
