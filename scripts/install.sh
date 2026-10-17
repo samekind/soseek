@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install the CLI from a published release. No server or account is configured.
 set -eu
-install_version=0.1.0
+install_version=0.2.0
 install_prefix="$HOME/.local/bin"
 install_base=https://github.com/samekind/soseek/releases/download
 while [ "$#" -gt 0 ]; do
@@ -9,7 +9,7 @@ while [ "$#" -gt 0 ]; do
         --version) [ "$#" -ge 2 ] || exit 2; install_version=$2; shift 2;;
         --prefix) [ "$#" -ge 2 ] || exit 2; install_prefix=$2; shift 2;;
         --base-url) [ "$#" -ge 2 ] || exit 2; install_base=$2; shift 2;;
-        --help|-h) printf '%s\n' 'Usage: install.sh [--version 0.1.0] [--prefix ~/.local/bin] [--base-url HTTPS_RELEASE_DOWNLOAD_URL]'; exit 0;;
+        --help|-h) printf '%s\n' 'Usage: install.sh [--version 0.2.0] [--prefix ~/.local/bin] [--base-url HTTPS_RELEASE_DOWNLOAD_URL]'; exit 0;;
         *) printf '%s\n' "Unknown option: $1" >&2; exit 2;;
     esac
 done

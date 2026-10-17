@@ -54,10 +54,10 @@ tag alone does not prove that the new frontend is embedded.
 sha256sum -c soseek_0.1.0_linux_amd64_image.tar.gz.sha256
 docker load -i soseek_0.1.0_linux_amd64_image.tar.gz
 # From deploy/, after preparing config.json and credentials as above:
-docker compose up -d --no-build
+SOSEEK_IMAGE=soseek:0.1.0 docker compose up -d --no-build
 ```
 
-Compose defaults to the local `soseek:0.1.0` image; `SOSEEK_IMAGE` can select an
+Compose defaults to the local `soseek:0.2.0` image; `SOSEEK_IMAGE` can select an
 explicit alternative tag. Image load does not import configuration, API keys,
 personal tokens or a database. ARM64 hosts should build their native image or
 explicitly provide their own emulation setup.

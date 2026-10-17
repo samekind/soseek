@@ -249,7 +249,7 @@ func TestResultClippingAndANSI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view["truncated"] != true || view["full_result_command"] != "soseek runs get run_1 --json" {
+	if view["truncated"] != true || view["full_result_command"] != "soseek runs get run_1 --full --json" {
 		t.Fatal(view)
 	}
 	src := view["results"].([]any)[0].(map[string]any)

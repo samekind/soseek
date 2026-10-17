@@ -33,9 +33,11 @@ type commandError struct {
 	message   string
 	runID     string
 	pendingID string
+	cause     error
 }
 
 func (e *commandError) Error() string { return e.message }
+func (e *commandError) Unwrap() error { return e.cause }
 func inputError(s string) error       { return &commandError{code: 2, message: s} }
 
 func main() {
@@ -214,6 +216,7 @@ func (a *app) discovery(ctx context.Context, command string, args []string) (int
 	fs := a.flagset(command)
 	fs.BoolVar(&a.json, "json", a.json, "output one JSON object")
 	fresh := fs.Bool("fresh", false, "refresh capability metadata from the server")
+	verbose := fs.Bool("verbose", false, "include full capability/schema details for doctor or providers")
 	if err := parseFlags(fs, args); err != nil {
 		return 2, err
 	}
@@ -243,7 +246,13 @@ func (a *app) discovery(ctx context.Context, command string, args []string) (int
 		return 4, err
 	}
 	if command == "doctor" {
-		out = map[string]any{"status": "ok", "server": c.BaseURL, "connection": c.Connection, "checks": map[string]string{"authenticated_api": "passed", "upstream_calls": "not_performed"}, "capabilities": out}
+		diagnostic := map[string]any{"status": "ok", "server": c.BaseURL, "connection": c.Connection, "checks": map[string]string{"authenticated_api": "passed", "upstream_calls": "not_performed"}}
+		if *verbose {
+			diagnostic["capabilities"] = out
+		}
+		out = diagnostic
+	} else if command == "providers" && !*verbose {
+		out = providerDirectory(out)
 	}
 	if _, isObject := out.(map[string]any); !isObject {
 		out = map[string]any{command: out}
@@ -284,13 +293,13 @@ func (a *app) submit(ctx context.Context, operation string, args []string) (int,
 	}
 	run, err := c.Submit(ctx, req, p.ID)
 	if err != nil {
-		return 4, &commandError{code: errorCode(err), message: err.Error() + "; submission may be accepted; resume with: soseek pending resume " + p.ID, pendingID: p.ID}
+		return 4, &commandError{code: errorCode(err), message: err.Error() + "; submission may be accepted; resume with: soseek pending resume " + p.ID, pendingID: p.ID, cause: err}
 	}
 	if err = client.Acknowledge(&p, run.ID); err != nil {
 		return 4, &commandError{code: 4, message: "run accepted, but local acknowledgement failed: " + err.Error(), runID: run.ID}
 	}
 	if options.detach {
-		return 0, a.print(run, "Accepted run "+run.ID+" ("+run.Status+")")
+		return 0, a.print(runView(run, options), "Accepted run "+run.ID+" ("+run.Status+")")
 	}
 	return a.wait(ctx, c, run, options)
 }
@@ -298,6 +307,9 @@ func (a *app) submit(ctx context.Context, operation string, args []string) (int,
 func (a *app) runs(ctx context.Context, args []string) (int, error) {
 	if len(args) == 0 {
 		return 2, inputError("usage: soseek runs get|wait|cancel RUN_ID")
+	}
+	if args[0] == "source" {
+		return a.source(ctx, args[1:])
 	}
 	fs := a.flagset("runs " + args[0])
 	options := newOutputOptions(fs, a)
@@ -321,16 +333,16 @@ func (a *app) runs(ctx context.Context, args []string) (int, error) {
 	if args[0] == "cancel" {
 		run, err := c.Cancel(ctx, id)
 		if err != nil {
-			return 4, err
+			return errorCode(err), runError(err, id)
 		}
-		return 0, a.print(run, "Cancellation requested for "+run.ID+" ("+run.Status+")")
+		return 0, a.print(runView(run, options), "Cancellation requested for "+run.ID+" ("+run.Status+")")
 	}
 	if args[0] != "get" && args[0] != "wait" {
 		return 2, inputError("unknown runs command")
 	}
 	run, err := c.Run(ctx, id)
 	if err != nil {
-		return 4, err
+		return errorCode(err), runError(err, id)
 	}
 	if args[0] == "wait" {
 		return a.wait(ctx, c, run, options)
@@ -338,7 +350,49 @@ func (a *app) runs(ctx context.Context, args []string) (int, error) {
 	if core.Terminal(run.Status) {
 		return a.finish(ctx, c, run, options)
 	}
-	return 0, a.print(run, run.ID+": "+run.Status)
+	return 0, a.print(runView(run, options), run.ID+": "+run.Status)
+}
+
+// source retrieves an existing stored source window. It deliberately has no
+// search/read submission path, even when a source is missing or expired.
+func (a *app) source(ctx context.Context, args []string) (int, error) {
+	fs := a.flagset("runs source")
+	fs.BoolVar(&a.json, "json", a.json, "output one source window JSON object")
+	offset := fs.Int("offset", 0, "start offset in Unicode code points")
+	maxChars := fs.Int("max-chars", 4000, "window length in Unicode code points (1..20000)")
+	if err := parseFlags(fs, args); err != nil {
+		return 2, err
+	}
+	if fs.NArg() != 2 {
+		return 2, inputError("usage: soseek runs source RUN_ID SOURCE_ID --offset 0 --max-chars 4000 --json")
+	}
+	if *offset < 0 || *maxChars < 1 || *maxChars > 20000 {
+		return 2, inputError("source offset must be nonnegative and --max-chars must be 1..20000")
+	}
+	id, sourceID := fs.Arg(0), fs.Arg(1)
+	if id == "" || strings.ContainsAny(id, "/\\?#") || sourceID == "" {
+		return 2, inputError("a valid run ID and unchanged source ID are required")
+	}
+	c, err := a.connect()
+	if err != nil {
+		return 3, err
+	}
+	window, err := c.Source(ctx, id, sourceID, *offset, *maxChars)
+	if err != nil {
+		return errorCode(err), runError(err, id)
+	}
+	if a.json {
+		return 0, a.emit(window)
+	}
+	fmt.Fprintln(a.out, a.clean(window.Text))
+	fmt.Fprintf(a.err, "Run: %s Source: %s; %s characters %d..%d of %d stored.\n", a.clean(window.RunID), a.clean(window.SourceID), a.clean(window.Field), window.Offset, window.Offset+window.ReturnedChars, window.TotalChars)
+	if window.NextOffset != nil {
+		fmt.Fprintf(a.err, "Continue stored text: soseek runs source %s %s --offset %d --max-chars %d --json\n", a.clean(id), a.clean(sourceID), *window.NextOffset, *maxChars)
+	}
+	if window.UpstreamTruncated {
+		fmt.Fprintln(a.err, "The stored source was already incomplete; pagination cannot retrieve text that was not stored.")
+	}
+	return 0, nil
 }
 
 func (a *app) pending(ctx context.Context, args []string) (int, error) {
@@ -393,7 +447,7 @@ func (a *app) pending(ctx context.Context, args []string) (int, error) {
 		return errorCode(err), err
 	}
 	if options.detach {
-		return 0, a.print(run, "Accepted run "+run.ID)
+		return 0, a.print(runView(run, options), "Accepted run "+run.ID)
 	}
 	return a.wait(ctx, c, run, options)
 }
@@ -438,7 +492,7 @@ func (a *app) wait(ctx context.Context, c *client.Client, run core.Run, o *optio
 		if run.Status != lastStatus {
 			if a.stream {
 				_ = a.emit(map[string]any{"type": "status", "run_id": run.ID, "status": run.Status})
-			} else {
+			} else if a.showProgress(o) {
 				a.diagnostic(run.ID + ": " + run.Status)
 			}
 			lastStatus = run.Status
@@ -528,6 +582,9 @@ func errorCode(err error) int {
 	}
 	return 4
 }
+func runError(err error, id string) error {
+	return &commandError{code: errorCode(err), message: err.Error(), runID: id, cause: err}
+}
 
 const helpText = `soseek — Search, read, and research through your cloud service.
 
@@ -542,6 +599,7 @@ Usage:
   soseek capabilities|providers|profiles|usage|doctor [--json]
   soseek operations PROVIDER [--json]
   soseek runs get|wait|cancel RUN_ID [--json]
+  soseek runs source RUN_ID SOURCE_ID [--offset N] [--max-chars 4000] [--json]
   soseek pending list [--json]
   soseek pending resume PENDING_ID [--detach] [--json]
 
@@ -555,11 +613,24 @@ Execution options:
   --fresh                Bypass cached upstream results
   --json                 Exactly one final JSON object on stdout
   --stream               NDJSON progress and final result; excludes --json
-  --fields LIST          Return selected top-level or results.FIELD values
-  --max-chars N          Clip returned text; does not reduce work or charges
+  --compact              Default compact evidence view; no extra model calls
+  --full                 Complete stored result, including raw/attempts/citations
+  --progress             Show status progress on stderr (quiet by default for agents)
+  --fields LIST          Project full result; title/url/content alias results.FIELD
+  --max-chars N          Further clip text; use --full to remove compact defaults
   --require-all          Exit 4 for partial results
 
 Ctrl-C stops local waiting. Use runs cancel to stop the cloud task explicitly.
+doctor is concise; --verbose includes capabilities. providers lists operations;
+operations PROVIDER returns their schemas. capabilities retains the full contract.
+Compact search snippets use at most 500 Unicode characters per source; research
+evidence uses 1200 and read uses 12000. Answers and source IDs remain intact.
+runs source reads stored evidence without another paid read. Offsets count
+Unicode code points, max-chars is 1..20000, and absent next_offset means stop.
+--fields takes precedence over compact defaults. --full and --compact conflict.
+--max-chars budgets answer/source text, not metadata, queries, or all JSON tokens.
+output_truncated describes this CLI view; source_content_truncated means the
+stored source was already incomplete and --full cannot recover missing content.
 Submission failures preserve their original request and idempotency key for
 24 hours; pending resume reuses both. Tokens and pending bodies are private.
 SOSEEK_URL, SOSEEK_TOKEN_FILE and SOSEEK_CONNECTION override saved configuration.

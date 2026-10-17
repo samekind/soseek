@@ -26,7 +26,7 @@ func TestOpenAPIResponseContractsAreCompleteAndResolvable(t *testing.T) {
 	want := map[string]string{
 		"/v1/plans": "Plan", "/v1/runs": "Run", "/v1/runs/{id}": "Run",
 		"/v1/runs/{id}/result": "Result", "/v1/runs/{id}/cancel": "Run",
-		"/v1/artifacts/{id}": "Result",
+		"/v1/artifacts/{id}": "Result", "/v1/runs/{id}/sources/{source}": "SourceWindow",
 	}
 	for path, schema := range want {
 		item, ok := paths[path].(map[string]any)
@@ -69,6 +69,37 @@ func TestOpenAPIResponseContractsAreCompleteAndResolvable(t *testing.T) {
 			}
 			break
 		}
+	}
+	sourceOp := paths["/v1/runs/{id}/sources/{source}"].(map[string]any)["get"].(map[string]any)
+	sourceResponses := sourceOp["responses"].(map[string]any)
+	for _, code := range []string{"200", "400", "401", "404", "409", "410", "500"} {
+		if _, ok := sourceResponses[code]; !ok {
+			t.Errorf("source window endpoint missing %s response", code)
+		}
+	}
+	params := sourceOp["parameters"].([]any)
+	for _, name := range []string{"id", "source", "offset", "max_chars"} {
+		found := false
+		for _, raw := range params {
+			param := raw.(map[string]any)
+			if param["name"] == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("source window endpoint missing parameter %q", name)
+		}
+	}
+	window := components["SourceWindow"].(map[string]any)
+	properties := window["properties"].(map[string]any)
+	for _, field := range []string{"run_id", "source_id", "url", "field", "text", "offset", "returned_chars", "total_chars", "next_offset", "truncated", "upstream_truncated"} {
+		if _, ok := properties[field]; !ok {
+			t.Errorf("SourceWindow missing %q", field)
+		}
+	}
+	if !strings.Contains(sourceOp["description"].(string), "no upstream calls") || !strings.Contains(sourceOp["description"].(string), "Unicode code points") {
+		t.Error("source window endpoint must document bounded saved text and code-point offsets")
 	}
 	stream := paths["/v1/runs/{id}/events"].(map[string]any)["get"].(map[string]any)
 	if !strings.Contains(stream["description"].(string), "Last-Event-ID") || !strings.Contains(stream["description"].(string), "after") {

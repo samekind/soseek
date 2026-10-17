@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "soseek API",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Public HTTP and SSE protocol. Run and result payload schemas are fully described below; provider capability details remain dynamic."
   },
   "paths": {
@@ -2460,6 +2460,131 @@
           }
         ]
       }
+    },
+    "/v1/runs/{id}/sources/{source}": {
+      "get": {
+        "summary": "Read a bounded window from a saved source",
+        "description": "Reads text already saved in the completed run result. Content is preferred; snippet is used when content is empty. Offsets and lengths count Unicode code points. This endpoint makes no upstream calls. `truncated` reports remaining stored text; `upstream_truncated` reports text omitted before storage and cannot be repaired by paging.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Zero-based Unicode code-point offset; an offset equal to total_chars returns an empty terminal window."
+          },
+          {
+            "in": "query",
+            "name": "max_chars",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20000,
+              "default": 4000
+            },
+            "description": "Maximum Unicode code points returned in this window."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded saved source text window",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceWindow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid offset or max_chars",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid, or revoked bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run is not owned by this principal or source ID is not present",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run is not complete yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Run payload has expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal operation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "description": "Reads text already saved in the completed run result. Content is preferred; snippet is used when content is empty. Offsets and lengths count Unicode code points. This endpoint makes no upstream calls. `truncated` is true when this window is not the entire stored text (including nonzero-offset windows); `upstream_truncated` indicates text already omitted before or during storage, which paging cannot recover."
     }
   },
   "components": {
@@ -3780,6 +3905,74 @@
           },
           "cache_seconds": {
             "type": "integer"
+          }
+        }
+      },
+      "SourceWindow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "source_id",
+          "url",
+          "field",
+          "text",
+          "offset",
+          "returned_chars",
+          "total_chars",
+          "truncated",
+          "upstream_truncated"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "published_at": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "content",
+              "snippet"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returned_chars": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_chars": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "next_offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when this window does not contain the entire stored field, including a later window beginning at a nonzero offset."
+          },
+          "upstream_truncated": {
+            "type": "boolean",
+            "description": "True when the saved source itself was already truncated upstream or at ingestion; paging cannot recover omitted text."
           }
         }
       }

@@ -54,6 +54,17 @@ func (c *Client) exa(ctx context.Context, ch core.Channel, key, op string, body 
 			out.Sources = append(out.Sources, core.Source{URL: address, Title: str(v["title"]), Snippet: snippet, Content: str(v["text"]), PublishedAt: str(v["publishedDate"])})
 		}
 	}
+	if op == "search" && highlightsRequested(body) {
+		missing := 0
+		for _, source := range out.Sources {
+			if strings.TrimSpace(source.Snippet) == "" {
+				missing++
+			}
+		}
+		if missing > 0 {
+			out.Warnings = append(out.Warnings, fmt.Sprintf("Exa returned %d result(s) without a snippet despite requested highlights; no replacement text was generated", missing))
+		}
+	}
 	for _, item := range array(m["statuses"]) {
 		v := object(item)
 		if status := str(v["status"]); status != "" && status != "success" {
@@ -62,6 +73,15 @@ func (c *Client) exa(ctx context.Context, ch core.Channel, key, op string, body 
 		}
 	}
 	return out, nil
+}
+
+func highlightsRequested(body map[string]any) bool {
+	value := object(body["contents"])["highlights"]
+	if enabled, ok := value.(bool); ok {
+		return enabled
+	}
+	_, ok := value.(map[string]any)
+	return ok
 }
 
 func (c *Client) tavily(ctx context.Context, ch core.Channel, key, op string, body map[string]any) (core.Output, error) {

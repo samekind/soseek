@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: ${SOSEEK_IMAGE:-soseek:0.1.0}
+    image: ${SOSEEK_IMAGE:-soseek:0.2.0}
     restart: unless-stopped
     init: true
     ports:

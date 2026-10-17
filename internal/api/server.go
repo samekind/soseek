@@ -80,6 +80,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /v1/runs", s.auth(http.HandlerFunc(s.submit)))
 	mux.Handle("GET /v1/runs/{id}", s.auth(http.HandlerFunc(s.getRun)))
 	mux.Handle("GET /v1/runs/{id}/result", s.auth(http.HandlerFunc(s.result)))
+	mux.Handle("GET /v1/runs/{id}/sources/{source}", s.auth(http.HandlerFunc(s.source)))
 	mux.Handle("POST /v1/runs/{id}/cancel", s.auth(http.HandlerFunc(s.cancel)))
 	mux.Handle("GET /v1/runs/{id}/events", s.auth(http.HandlerFunc(s.events)))
 	mux.Handle("GET /v1/artifacts/{id}", s.auth(http.HandlerFunc(s.artifact)))

@@ -3,11 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/samekind/soseek/internal/core"
+	"golang.org/x/term"
 )
 
 // Strip complete CSI and OSC sequences, not merely ESC, so terminal source
@@ -77,7 +79,7 @@ func (a *app) humanResult(obj map[string]any) error {
 			}
 			r := []rune(text)
 			if len(r) > 600 {
-				text = string(r[:600]) + "… [summary clipped; use --json for full text]"
+				text = string(r[:600]) + "… [display summary; use runs source or --full --json for stored text]"
 			}
 			if text != "" {
 				fmt.Fprintln(a.out, a.clean(text))
@@ -92,7 +94,7 @@ func (a *app) humanResult(obj map[string]any) error {
 			}
 		}
 	}
-	if truncated, _ := obj["truncated"].(bool); truncated {
+	if truncated, _ := obj["output_truncated"].(bool); truncated {
 		fmt.Fprintln(a.err, "Output clipped; full result:", a.clean(fmt.Sprint(obj["full_result_command"])))
 	}
 	if usage, ok := obj["usage"].(map[string]any); ok {
@@ -105,6 +107,93 @@ func (a *app) humanResult(obj map[string]any) error {
 			fmt.Fprintf(a.err, "Provider credits: %g (not added to USD).\n", credits)
 		}
 	}
+	if truncated, _ := obj["source_content_truncated"].(bool); truncated {
+		fmt.Fprintln(a.err, "Some stored source text is incomplete; --full cannot recover text the service did not store.")
+	}
 	fmt.Fprintln(a.err, "Run:", a.clean(fmt.Sprint(obj["run_id"])), "Status:", a.clean(fmt.Sprint(obj["status"])))
 	return nil
+}
+
+// Only an interactive human view receives implicit status chatter. Agents can
+// request progress explicitly without hiding stderr and losing diagnostics.
+func (a *app) showProgress(o *options) bool {
+	if o.progress {
+		return true
+	}
+	if a.json {
+		return false
+	}
+	file, ok := a.out.(*os.File)
+	return ok && term.IsTerminal(int(file.Fd()))
+}
+
+// The providers endpoint currently returns provider -> operation schemas. Keep
+// the directory useful without broadcasting every provider's input schema.
+func providerDirectory(value any) any {
+	root, ok := value.(map[string]any)
+	if !ok {
+		return map[string]any{"providers": value}
+	}
+	providers := root
+	if nested, ok := root["providers"].(map[string]any); ok {
+		providers = nested
+	}
+	directory := map[string]any{}
+	for name, raw := range providers {
+		entries, ok := raw.([]any)
+		if !ok {
+			continue
+		}
+		operations := []any{}
+		for _, entry := range entries {
+			operation, ok := entry.(map[string]any)
+			if !ok {
+				continue
+			}
+			small := map[string]any{}
+			copyFields(small, operation, "id", "description")
+			if description, ok := small["description"].(string); ok {
+				runes := []rune(description)
+				if len(runes) > 160 {
+					small["description"] = string(runes[:160]) + "…"
+				}
+			}
+			operations = append(operations, small)
+		}
+		directory[name] = operations
+	}
+	view := map[string]any{"providers": directory, "schema_command": "soseek operations PROVIDER --json"}
+	copyFields(view, root, "revision")
+	if channels, ok := root["channels"].([]any); ok {
+		compact := []any{}
+		for _, item := range channels {
+			if channel, ok := item.(map[string]any); ok {
+				entry := map[string]any{}
+				copyFields(entry, channel, "id", "provider", "declared_operations", "available")
+				if reason, ok := channel["unavailable_reason"].(string); ok && reason != "" {
+					entry["unavailable_reason"] = reason
+				}
+				compact = append(compact, entry)
+			}
+		}
+		view["channels"] = compact
+	}
+	return view
+}
+
+func runView(run core.Run, o *options) any {
+	if o.full {
+		return run
+	}
+	view := map[string]any{"run_id": run.ID, "status": run.Status, "operation": run.Request.Operation, "result_command": "soseek runs get " + run.ID + " --json"}
+	if run.Error != nil {
+		view["error"] = run.Error
+	}
+	if len(run.Plan.Warnings) > 0 {
+		view["warnings"] = run.Plan.Warnings
+	}
+	if run.CancelRequested {
+		view["cancel_requested"] = true
+	}
+	return view
 }

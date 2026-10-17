@@ -177,22 +177,67 @@ soseek research "query" --stream
 soseek runs get RUN_ID --fields answer,results.title,results.url --max-chars 8000 --json
 ```
 
-`--json` writes one final JSON object to stdout, including errors. Progress and
-warnings go to stderr. Use the JSON `status`, `warnings`, and `attempts` to assess
-partial results.
+Since 0.2, execution results default to a **compact** evidence view (`--compact`
+is an explicit alias). It retains the complete answer, every source identity and
+URL, query coverage, warnings/gaps, and all usage accounting. Ordinary successful
+attempts, routing, hashes, timestamps, raw payloads, and repeated citation text
+are available with `--full`. Failed or unsettled attempts remain in
+`attempt_issues`. `--full` and `--compact` are mutually exclusive.
+
+`--json` writes one final JSON object to stdout, including errors. JSON and
+non-interactive use suppress routine progress; `--progress` explicitly enables
+stderr status updates. Errors and recovery diagnostics remain. Use `status`,
+`warnings`, `gaps`, `attempt_issues`, and `usage` to assess partial results.
+
+Compact search snippets are limited to 500 Unicode characters per source;
+research/answer content excerpts to 1,200; read content to 12,000. The answer
+itself is not clipped unless you request `--max-chars`. Compact citations are
+reference links, not character spans; `--full` retains original upstream
+`answer_text` and the offsets that refer to that text.
 
 `--stream` writes NDJSON with `status`, `event`, and final `result` records. It
 consumes SSE progress when available and checks run snapshots independently;
 losing the event stream does not lose the result. A local error is an `error`
 object. `--stream` cannot be combined with `--json` or `--detach`.
 
-`--fields` selects result fields; `results.FIELD` selects fields within each
-source. Run identity, status, warnings, and source URLs remain available.
+`--fields` selects from the **complete stored result**, overriding the default
+compact projection; `results.FIELD` selects fields within each source. Simple
+source field aliases also work: `--fields title,url,published_at`. Identity,
+status, warnings, gaps, query coverage, usage, and attempt issues remain visible.
 `--max-chars` clips answer/source text across the returned result, counting
 Unicode characters. It does not reduce executed work or billing. Clipped results
-set `truncated: true` and provide the command/URL to retrieve the complete result.
+remove raw payloads and replace citation text/offsets with reference links;
+the budget does not bound identity, query, status, or accounting JSON fields.
+Clipped results set `output_truncated: true` and provide a command to retrieve
+the stored result.
+`source_content_truncated` separately means the stored evidence was already
+incomplete; `--full` cannot recover text the service never saved.
 Human-readable output uses short source summaries and removes terminal control
 sequences from provider text.
+
+Read a saved source without another upstream fetch or charge:
+
+```sh
+soseek runs source RUN_ID SOURCE_ID --offset 0 --max-chars 4000 --json
+soseek runs get RUN_ID --full --json
+```
+
+Use the returned `next_offset` for the next window; stop when it is absent.
+Offsets count Unicode code points, not bytes. The default window is 4,000, the
+maximum 20,000. `field` distinguishes saved page `content` from a `snippet`;
+`upstream_truncated` means the stored source was already truncated by the
+provider or service. An expired run returns 410. On older servers the CLI can
+read the saved result and apply the same window locally.
+
+`doctor --json` only reports access checks. `doctor --verbose --json` and
+`capabilities --json` return complete discovery; `providers --json` is a short
+operation catalog, and `operations PROVIDER --json` gives its input schemas.
+
+Standard Exa search now requests query-relevant highlights (up to 500 characters
+per URL) in the same search call. It does not automatically fetch every page.
+Explicit `--opt 'exa.contents={"highlights":false}'` preserves the upstream
+option, and native `call exa.search` input is unchanged. If the upstream omits
+snippets, a warning reports that gap; soseek does not silently retry or fetch.
 
 | Exit code | Meaning |
 | --- | --- |

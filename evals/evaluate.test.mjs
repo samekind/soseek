@@ -33,6 +33,8 @@ test('live runner with mock CLI saves 429 then stops before the next question',a
   let stderr='';child.stderr.on('data',x=>stderr+=x);child.stdout.resume();const code=await new Promise(resolve=>child.on('close',resolve));assert.equal(code,1,stderr);
   const recorded=(await fs.readFile(calls,'utf8')).trim().split('\n').map(JSON.parse);
   assert.equal(recorded.filter(x=>x[0]==='search').length,3);assert.equal(recorded.filter(x=>x[0]==='usage').length,1);
+  assert.ok(recorded.filter(x=>x[0]==='search').every(x=>x.includes('--full')),'evaluation searches require all attempts for metrics and rate-limit checks');
+  assert.ok(recorded.filter(x=>x[0]==='usage').every(x=>!x.includes('--full')),'usage is not a projected result command');
   const report=JSON.parse(await fs.readFile(path.join(out,'stop-report.json'),'utf8'));assert.equal(report.reason,'rate_limit_observed');assert.equal(report.automatic_retry,false);assert.equal(report.finished_runs,3);
   const summary=JSON.parse(await fs.readFile(path.join(out,'summary.json'),'utf8'));assert.equal(summary.completed,false);assert.equal(summary.finished_runs,3);
   const raw=JSON.parse(await fs.readFile(path.join(out,'tech-01-merged.json'),'utf8'));assert.equal(raw.result.attempts[0].error.retry_after_seconds,90);
@@ -44,4 +46,39 @@ test('provider list determines variants without touching excluded providers',()=
  assert.deepEqual(makeVariants(['exa','tavily']).map(v=>v[0]),['exa','tavily','merged']);
  assert.deepEqual(makeVariants(['exa','tavily'])[2][1],['--providers','exa,tavily']);
  assert.throws(()=>makeVariants(['exa','exa']));
+});
+
+test('acceptance provider and research suites explicitly retain complete audit artifacts',async()=>{
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'soseek-acceptance-view-test-'));
+ try{
+  const binary=path.join(directory,'fake-soseek'),calls=path.join(directory,'calls');
+  const audit={
+   run_id:'fixture-run',status:'succeeded',results:[{source_id:'S1',url:'https://example.org/',snippet:'Evidence'}],
+   attempts:[{id:'fixture-attempt',provider:'exa',status:'succeeded',usage:{cost_known:true,reported_micros:7000}}],
+   routing:[{provider:'exa',channel:'fixture-channel',operation:'search'}],
+   citations:[{source_id:'S1',url:'https://example.org/',answer_text:'Evidence',start_index:0,end_index:8,offset_unit:'upstream'}],
+   raw:{fixture_audit:'preserved'}
+  };
+  const mock=`#!/usr/bin/env node\nconst fs=require('node:fs');const args=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(args)+'\\n');const full=${JSON.stringify(audit)};console.log(JSON.stringify(args.includes('--full')?full:{run_id:full.run_id,status:full.status,results:full.results}));\n`;
+  await fs.writeFile(binary,mock,{mode:0o700});
+  for(const suite of ['providers','research']){
+   const output=path.join(directory,suite);
+   const child=spawn(process.execPath,[path.join(root,'scripts/acceptance.mjs'),'--live','--suite',suite,'--binary',binary,'--out',output],{env:{...process.env,SOSEEK_URL:'http://127.0.0.1:1',SOSEEK_TOKEN_FILE:'',SOSEEK_OTHER_TOKEN_FILE:''},stdio:['ignore','pipe','pipe']});
+   let stderr='';child.stderr.on('data',x=>stderr+=x);child.stdout.resume();
+   const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve)});assert.equal(code,0,stderr);
+   const summary=JSON.parse(await fs.readFile(path.join(output,'summary.json'),'utf8'));
+   assert.equal(summary.length,suite==='providers'?9:3);
+   for(const entry of summary){
+    const saved=JSON.parse(await fs.readFile(path.join(output,entry.name+'.json'),'utf8'));
+    assert.deepEqual(saved.result.attempts,audit.attempts,entry.name);
+    assert.deepEqual(saved.result.routing,audit.routing,entry.name);
+    assert.deepEqual(saved.result.citations,audit.citations,entry.name);
+    assert.deepEqual(saved.result.raw,audit.raw,entry.name);
+   }
+  }
+  const recorded=(await fs.readFile(calls,'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(recorded.length,12);
+  assert.ok(recorded.every(args=>args.includes('--full')));
+  assert.deepEqual([...new Set(recorded.map(args=>args[0]))].sort(),['answer','call','read','research','search']);
+ }finally{await fs.rm(directory,{recursive:true,force:true});}
 });

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 const SchemaVersion = "1.0"
 
 type Config struct {

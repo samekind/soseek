@@ -22,7 +22,7 @@ func (f *multiFlag) Set(v string) error { *f = append(*f, v); return nil }
 type options struct {
 	provider, providers, channel, intent, profile, mode, budget, deadline, input, fields string
 	limit, maxChars                                                                      int
-	fresh, plan, detach, requireAll                                                      bool
+	fresh, plan, detach, requireAll, full, compact, progress                             bool
 	waitTimeout                                                                          time.Duration
 	opts                                                                                 multiFlag
 	a                                                                                    *app
@@ -36,6 +36,9 @@ func newOutputOptions(fs *flag.FlagSet, a *app) *options {
 	fs.StringVar(&o.fields, "fields", "", "comma-separated response fields, including results.title")
 	fs.IntVar(&o.maxChars, "max-chars", 0, "maximum returned text characters; 0 means no clipping")
 	fs.BoolVar(&o.requireAll, "require-all", false, "return exit 4 on a partial result")
+	fs.BoolVar(&o.full, "full", false, "return the complete stored result, including raw responses and attempts")
+	fs.BoolVar(&o.compact, "compact", false, "return the default compact evidence view (excludes --full)")
+	fs.BoolVar(&o.progress, "progress", false, "show run status progress on stderr, including with --json")
 	return o
 }
 func newOptions(fs *flag.FlagSet, a *app) *options {
@@ -94,6 +97,9 @@ func (o *options) validateOutput() error {
 	if o.a.json && o.a.stream {
 		return inputError("--json and --stream are mutually exclusive")
 	}
+	if o.full && o.compact {
+		return inputError("--full and --compact are mutually exclusive")
+	}
 	if o.maxChars < 0 {
 		return inputError("--max-chars cannot be negative")
 	}
@@ -101,11 +107,14 @@ func (o *options) validateOutput() error {
 		return inputError("--wait-timeout must be positive")
 	}
 	if o.fields != "" {
-		for _, field := range strings.Split(o.fields, ",") {
-			if !validField(strings.TrimSpace(field)) {
-				return inputError("unsupported --fields value; use result fields or results.FIELD")
+		fields := strings.Split(o.fields, ",")
+		for i, field := range fields {
+			fields[i] = normalizeField(strings.TrimSpace(field))
+			if !validField(fields[i]) {
+				return inputError("unsupported --fields value " + strconv.Quote(strings.TrimSpace(field)) + "; use answer, usage, results.title, results.url, or results.content (title/url/content are source-field aliases)")
 			}
 		}
+		o.fields = strings.Join(fields, ",")
 	}
 	return nil
 }
@@ -253,7 +262,7 @@ func (o *options) request(operation, value string, in io.Reader) (core.Request, 
 	return r, nil
 }
 
-var resultFields = map[string]bool{"schema_version": true, "run_id": true, "status": true, "operation": true, "results": true, "answer": true, "attempts": true, "usage": true, "routing": true, "warnings": true, "gaps": true, "stop_reason": true, "truncated": true, "raw": true}
+var resultFields = map[string]bool{"schema_version": true, "run_id": true, "status": true, "operation": true, "results": true, "queries": true, "citations": true, "retrieval_events": true, "answer": true, "attempts": true, "usage": true, "routing": true, "warnings": true, "gaps": true, "stop_reason": true, "truncated": true, "raw": true}
 var sourceFields = map[string]bool{"source_id": true, "url": true, "canonical_url": true, "title": true, "snippet": true, "content": true, "published_at": true, "fetched_at": true, "found_by": true, "occurrences": true, "score": true, "content_hash": true, "truncated": true}
 
 func validField(field string) bool {
@@ -264,99 +273,317 @@ func validField(field string) bool {
 	return ok && p == "results" && sourceFields[f]
 }
 
+func normalizeField(field string) string {
+	if !resultFields[field] && sourceFields[field] {
+		return "results." + field
+	}
+	return field
+}
+
+// resultView only projects stored data. It never starts another upstream call.
 func resultView(result core.Result, o *options, server string) (map[string]any, error) {
 	b, err := json.Marshal(result)
 	if err != nil {
 		return nil, err
 	}
-	var obj map[string]any
-	if err = json.Unmarshal(b, &obj); err != nil {
+	var original map[string]any
+	if err = json.Unmarshal(b, &original); err != nil {
 		return nil, err
 	}
-	truncated := result.Truncated
+	view := original
+	projected := o.fields != "" || !o.full
 	if o.fields != "" {
-		selected := map[string]any{}
-		sourceSelection := map[string]bool{}
-		for _, field := range strings.Split(o.fields, ",") {
-			field = strings.TrimSpace(field)
-			if strings.HasPrefix(field, "results.") {
-				sourceSelection[strings.TrimPrefix(field, "results.")] = true
-			} else if v, ok := obj[field]; ok {
-				selected[field] = v
+		view = fieldView(original, o.fields, result)
+	} else if !o.full {
+		view = compactView(original, result)
+	}
+	projectionTruncated := false
+	if sources, ok := view["results"].([]any); ok {
+		for _, item := range sources {
+			if source, ok := item.(map[string]any); ok && (source["content_truncated"] == true || source["snippet_truncated"] == true) {
+				projectionTruncated = true
 			}
 		}
-		if len(sourceSelection) > 0 {
-			items, _ := obj["results"].([]any)
-			filtered := make([]any, 0, len(items))
-			for _, item := range items {
-				src, ok := item.(map[string]any)
-				if !ok {
-					continue
-				}
-				dst := map[string]any{}
-				for _, key := range []string{"source_id", "url", "truncated"} {
-					if v, exists := src[key]; exists {
-						dst[key] = v
-					}
-				}
-				for key := range sourceSelection {
-					if v, exists := src[key]; exists {
-						dst[key] = v
-					}
-				}
-				filtered = append(filtered, dst)
-			}
-			selected["results"] = filtered
-		}
-		for _, key := range []string{"schema_version", "run_id", "status", "operation", "warnings", "gaps", "stop_reason"} {
-			if v, exists := obj[key]; exists {
-				selected[key] = v
-			}
-		}
-		obj = selected
-		truncated = true
 	}
 	if o.maxChars > 0 {
 		remaining := o.maxChars
-		clip := func(m map[string]any, key string) bool {
-			s, ok := m[key].(string)
-			if !ok {
-				return false
-			}
-			r := []rune(s)
-			if len(r) <= remaining {
-				remaining -= len(r)
-				return false
-			}
-			m[key] = string(r[:remaining])
-			remaining = 0
-			truncated = true
-			return true
+		if clipText(view, "answer", &remaining) {
+			projectionTruncated = true
 		}
-		clip(obj, "answer")
-		if items, ok := obj["results"].([]any); ok {
-			for _, item := range items {
-				if src, ok := item.(map[string]any); ok {
-					cut := false
-					for _, key := range []string{"title", "snippet", "content"} {
-						cut = clip(src, key) || cut
-					}
-					if cut {
-						src["truncated"] = true
+		if sources, ok := view["results"].([]any); ok {
+			for _, item := range sources {
+				if source, ok := item.(map[string]any); ok {
+					for _, field := range []string{"snippet", "content"} {
+						if clipText(source, field, &remaining) {
+							projectionTruncated = true
+						}
 					}
 				}
 			}
 		}
-		// Raw responses cannot be safely clipped without changing their shape.
-		if _, ok := obj["raw"]; ok {
-			delete(obj, "raw")
-			truncated = true
+		if _, ok := view["raw"]; ok {
+			delete(view, "raw")
+			view["raw_available"] = true
+			projectionTruncated = true
+		}
+		// Native citations can duplicate entire upstream answers. Under an
+		// explicit text budget keep reference links, never truncated text with
+		// offsets that could be mistaken for offsets into the displayed answer.
+		if citations, ok := view["citations"].([]any); ok && len(citations) > 0 {
+			references := []any{}
+			for _, item := range citations {
+				if citation, ok := item.(map[string]any); ok {
+					ref := map[string]any{}
+					copyFields(ref, citation, "source_id", "url")
+					references = append(references, ref)
+				}
+			}
+			view["citations"] = references
+			view["citation_mode"] = "reference-only; original text and offsets are available with --full"
+			view["citations_truncated"] = true
+			projectionTruncated = true
 		}
 	}
-	obj["truncated"] = truncated
-	if truncated {
-		obj["full_result_url"] = server + "/v1/runs/" + result.RunID + "/result"
-		obj["full_result_command"] = fmt.Sprintf("soseek runs get %s --json", result.RunID)
+	view["truncated"] = result.Truncated || projectionTruncated
+	sourceTruncated := result.Truncated
+	for _, source := range result.Results {
+		sourceTruncated = sourceTruncated || source.Truncated
 	}
-	return obj, nil
+	view["source_content_truncated"] = sourceTruncated
+	view["output_truncated"] = projected || projectionTruncated
+	if projected || projectionTruncated {
+		view["view"] = "compact"
+		if o.fields != "" {
+			view["view"] = "fields"
+		} else if o.full {
+			view["view"] = "full"
+		}
+		view["full_result_command"] = fmt.Sprintf("soseek runs get %s --full --json", result.RunID)
+		for _, source := range result.Results {
+			if source.ID != "" {
+				view["source_command"] = fmt.Sprintf("soseek runs source %s SOURCE_ID --offset 0 --max-chars 4000 --json", result.RunID)
+				break
+			}
+		}
+	}
+	return view, nil
+}
+
+// Preserve identity, accounting, failures and gaps even under an explicit field
+// projection. Selected fields always come from the full original response.
+func fieldView(original map[string]any, fields string, result core.Result) map[string]any {
+	selected := map[string]any{}
+	sourceSelection := map[string]bool{}
+	for _, field := range strings.Split(fields, ",") {
+		field = normalizeField(strings.TrimSpace(field))
+		if strings.HasPrefix(field, "results.") {
+			sourceSelection[strings.TrimPrefix(field, "results.")] = true
+		} else if value, ok := original[field]; ok {
+			selected[field] = value
+		}
+	}
+	if len(sourceSelection) > 0 && selected["results"] == nil {
+		filtered := []any{}
+		if sources, ok := original["results"].([]any); ok {
+			for _, item := range sources {
+				source, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				entry := map[string]any{}
+				for _, field := range []string{"source_id", "url", "truncated"} {
+					if value, ok := source[field]; ok {
+						entry[field] = value
+					}
+				}
+				for field := range sourceSelection {
+					if value, ok := source[field]; ok {
+						entry[field] = value
+					}
+				}
+				filtered = append(filtered, entry)
+			}
+		}
+		selected["results"] = filtered
+	}
+	copyFields(selected, original, "schema_version", "run_id", "status", "operation", "usage", "warnings", "gaps", "stop_reason", "queries")
+	if issues := attemptIssues(result.Attempts); len(issues) > 0 {
+		selected["attempt_issues"] = issues
+	}
+	// Keeping an answer without its source identities would break [S1] references.
+	if answer, _ := selected["answer"].(string); answer != "" && selected["results"] == nil {
+		refs := []any{}
+		for _, source := range result.Results {
+			refs = append(refs, map[string]any{"source_id": source.ID, "url": source.URL})
+		}
+		selected["results"] = refs
+	}
+	return selected
+}
+
+func compactView(original map[string]any, result core.Result) map[string]any {
+	view := map[string]any{}
+	copyFields(view, original, "schema_version", "run_id", "status", "operation", "answer", "usage", "warnings", "gaps", "stop_reason", "queries")
+	sources := []any{}
+	for _, source := range result.Results {
+		entry := map[string]any{"url": source.URL}
+		if source.ID != "" {
+			entry["source_id"] = source.ID
+		}
+		if source.Title != "" {
+			entry["title"] = source.Title
+		}
+		if source.PublishedAt != "" {
+			entry["published_at"] = source.PublishedAt
+		}
+		if len(source.FoundBy) > 0 {
+			entry["found_by"] = source.FoundBy
+		}
+		queryIDs := []string{}
+		for _, occurrence := range source.Occurrences {
+			if occurrence.QueryID != "" && !containsString(queryIDs, occurrence.QueryID) {
+				queryIDs = append(queryIDs, occurrence.QueryID)
+			}
+		}
+		if len(queryIDs) > 0 {
+			entry["query_ids"] = queryIDs
+		}
+		if source.Truncated {
+			entry["source_content_truncated"] = true
+		}
+		entry["evidence_type"] = "reference"
+		if source.Snippet != "" {
+			entry["snippet"] = source.Snippet
+			entry["evidence_type"] = "snippet"
+			remaining := 500
+			clipText(entry, "snippet", &remaining)
+		}
+		if source.Content != "" {
+			limit := 0
+			switch result.Operation {
+			case "read":
+				limit = 12000
+			case "research", "answer":
+				limit = 1200
+			default:
+				if strings.HasSuffix(result.Operation, ".contents") || strings.HasSuffix(result.Operation, ".extract") || strings.HasSuffix(result.Operation, ".scrape") {
+					limit = 12000
+				} else if result.Operation != "search" {
+					limit = 1200
+				}
+			}
+			if limit > 0 {
+				entry["evidence_type"] = "content"
+			} else if source.Snippet == "" {
+				entry["snippet"] = source.Content
+				entry["snippet_from"] = "content"
+				entry["evidence_type"] = "content_excerpt"
+				remaining := 500
+				clipText(entry, "snippet", &remaining)
+			}
+			entry["content"] = source.Content
+			remaining := limit
+			clipText(entry, "content", &remaining)
+			if limit == 0 {
+				delete(entry, "content")
+			}
+		}
+		sources = append(sources, entry)
+	}
+	view["results"] = sources
+	if issues := attemptIssues(result.Attempts); len(issues) > 0 {
+		view["attempt_issues"] = issues
+	}
+	references := []any{}
+	seen := map[string]bool{}
+	for _, citation := range result.Citations {
+		// Upstream offsets refer to upstream answer_text, not necessarily Result.Answer.
+		// This view only gives links that are actually mentioned in the displayed answer.
+		cited := citation.SourceID != "" && strings.Contains(result.Answer, "["+citation.SourceID+"]") || citation.URL != "" && strings.Contains(result.Answer, citation.URL)
+		key := citation.SourceID + "\n" + citation.URL
+		if !cited || seen[key] {
+			continue
+		}
+		seen[key] = true
+		ref := map[string]any{"url": citation.URL}
+		if citation.SourceID != "" {
+			ref["source_id"] = citation.SourceID
+		}
+		references = append(references, ref)
+	}
+	if len(references) > 0 {
+		view["citations"] = references
+		view["citation_mode"] = "reference-only; original text and offsets are available with --full"
+	}
+	if len(result.Raw) > 0 {
+		view["raw_available"] = true
+	}
+	return view
+}
+func copyFields(dst, src map[string]any, fields ...string) {
+	for _, field := range fields {
+		if value, ok := src[field]; ok {
+			dst[field] = value
+		}
+	}
+}
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+// A compact output must retain costly uncertainty and failures even when a run
+// delivered useful evidence. Successful known-cost attempts stay in --full.
+func attemptIssues(attempts []core.Attempt) []any {
+	issues := []any{}
+	for _, attempt := range attempts {
+		unknown := !attempt.Cached && !attempt.Usage.CostKnown && attempt.Usage.ReportedMicros == 0 && attempt.Usage.EstimatedMicros == 0
+		if attempt.Error == nil && attempt.Status == "succeeded" && !unknown && attempt.Usage.UnsettledAttempts == 0 && attempt.Usage.ReservedMicros == 0 {
+			continue
+		}
+		issue := map[string]any{"provider": attempt.Provider, "channel": attempt.Channel, "operation": attempt.Operation, "status": attempt.Status, "usage": attempt.Usage}
+		if attempt.ID != "" {
+			issue["id"] = attempt.ID
+		}
+		if attempt.MaxMicros > 0 {
+			issue["max_micros"] = attempt.MaxMicros
+		}
+		if attempt.Error != nil {
+			issue["error"] = attempt.Error
+		}
+		if unknown {
+			issue["cost_unknown"] = true
+		}
+		issues = append(issues, issue)
+	}
+	return issues
+}
+
+// Lengths and offsets are Unicode code points, matching runs source windows.
+func clipText(target map[string]any, field string, remaining *int) bool {
+	text, ok := target[field].(string)
+	if !ok {
+		return false
+	}
+	runes := []rune(text)
+	if len(runes) <= *remaining {
+		*remaining -= len(runes)
+		return false
+	}
+	total := len(runes)
+	if original, ok := target[field+"_total_chars"].(int); ok && original > total {
+		total = original
+	}
+	target[field] = string(runes[:*remaining])
+	target[field+"_truncated"] = true
+	target[field+"_total_chars"] = total
+	if field == "content" {
+		target["content_available"] = true
+	}
+	*remaining = 0
+	return true
 }

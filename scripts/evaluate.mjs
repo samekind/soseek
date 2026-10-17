@@ -116,7 +116,9 @@ export async function main(args=process.argv.slice(2)){
  if(initial.exit!==0){await conclude({reason:'usage_preflight_failed',error:initial.result?.error??null});return 1;}
  for(const q of cases){
   for(const [variant,flags]of selectedVariants){
-   const r=await runCLI(binary,['search',q.query,...flags,'--limit','5','--budget-usd',budget,'--deadline','60s','--wait-timeout','90s','--json']);
+   // Evaluation counts every attempt and retains its errors/charges; compact
+   // CLI evidence views intentionally omit some of that audit information.
+   const r=await runCLI(binary,['search',q.query,...flags,'--limit','5','--budget-usd',budget,'--deadline','60s','--wait-timeout','90s','--full','--json']);
    const row=metrics(q,variant,r);rows.push(row);
    await save(path.join(output,q.id+'-'+variant+'.json'),{question:q,...r});await save(path.join(output,'metrics.json'),rows);
    console.log(JSON.stringify({type:'run',...row}));

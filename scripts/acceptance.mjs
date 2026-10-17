@@ -12,6 +12,9 @@ const save=(n,v)=>fs.writeFile(path.join(output,n+'.json'),JSON.stringify(v,null
 const limited=d=>d&&typeof d==='object'&&(Object.entries(d).some(([k,v])=>['rate_limited','upstream_rate_limited','http_429'].includes(v)||(k==='retry_after_seconds'&&v>0)||(k==='status'&&v===429))||Object.values(d).some(limited));
 const records=[];
 async function cli(name,argv,extra={}){
+ // Acceptance artifacts must retain attempts, routing and original citation
+ // offsets even when interactive CLI output defaults to compact evidence.
+ argv=[...argv,'--full'];
  const r=await new Promise(resolve=>{let stdout='',stderr='';const start=Date.now();const c=spawn(binary,argv,{env:{...process.env,...extra},stdio:['ignore','pipe','pipe']});const timer=setTimeout(()=>c.kill('SIGTERM'),240000);c.stdout.on('data',d=>stdout+=d);c.stderr.on('data',d=>stderr+=d);c.on('error',e=>{clearTimeout(timer);resolve({exit:-1,error:e.message})});c.on('close',exit=>{clearTimeout(timer);let result;try{result=JSON.parse(stdout)}catch{result={parse_error:true}}resolve({exit,result,stderr,elapsed_ms:Date.now()-start})})});
  await save(name,r);records.push({name,exit:r.exit,status:r.result?.status,run_id:r.result?.run_id,elapsed_ms:r.elapsed_ms,source_count:r.result?.results?.length,stop_reason:r.result?.stop_reason});await save('summary',records);
  console.log(JSON.stringify(records.at(-1)));

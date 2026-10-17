@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/samekind/soseek/internal/core"
+	"github.com/samekind/soseek/internal/provider"
 )
 
 type Engine struct {
@@ -374,6 +375,9 @@ func (e *Engine) route(req core.Request, p core.Principal, op string, broad bool
 					limit = min(limit, 8)
 				}
 				call := core.Call{Operation: op, Query: req.Query, URL: req.URL, Limit: limit, Options: optionsFor(req.Options, name), Input: req.Input}
+				if !strings.Contains(req.Operation, ".") && op == "search" {
+					call = provider.StandardSearchCall(c, call)
+				}
 				var boundErr error
 				call, boundErr = e.boundedCall(c, call)
 				if boundErr != nil {

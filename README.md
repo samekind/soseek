@@ -138,7 +138,17 @@ soseek runs get RUN_ID --json
 soseek runs cancel RUN_ID
 ```
 
-`--json` writes exactly one final JSON object to stdout. Progress goes to stderr.
+The CLI defaults to a compact evidence view. `--json` writes exactly one final
+JSON object to stdout, with routine progress suppressed. Use `--progress` to
+request stderr progress, or `--full` for the complete stored evidence and audit.
+`doctor --json` is a small access check; `doctor --verbose --json` includes the
+full capability schemas. Read saved evidence without a new provider request:
+
+```sh
+soseek runs source RUN_ID SOURCE_ID --offset 0 --max-chars 4000 --json
+soseek runs get RUN_ID --full --json
+```
+
 `--stream` instead writes NDJSON events and a final result, using the server's SSE
 event stream. The modes are mutually exclusive. Ctrl-C stops local waiting;
 `runs cancel` explicitly requests server-side cancellation.
@@ -207,7 +217,7 @@ the search quality or billing behavior of a live provider. Real acceptance must
 exercise CLI → HTTPS server → the configured provider, including the intended
 Grok model for research.
 
-`scripts/release.sh 0.1.0` builds macOS/Linux/Windows clients for arm64 and amd64,
+`scripts/release.sh 0.2.0` builds macOS/Linux/Windows clients for arm64 and amd64,
 Linux server binaries, archives, and checksums. It does not publish them.
 
 Architecture and remaining design boundaries are described in [DESIGN.md](DESIGN.md),

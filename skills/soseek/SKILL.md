@@ -11,7 +11,7 @@ For EOF/TLS connection errors, distinguish the configured proxy path from the cl
 
 ## Choose the work
 
-- Already know what to look for: use `search`, then `read` for promising URLs. Use project context to choose queries and check whether the sources answer the question.
+- Already know what to look for: use `search`, inspect snippets, then `read` only the URLs needing deeper evidence. Standard Exa search requests short query-relevant highlights in the same call. Missing snippets remain a gap; do not automatically read every result.
 - Have URLs: use `read` directly.
 - Want Grok's own Web Search: use `search --provider grok`. It returns Grok's native search evidence and synthesis; a cited URL alone does not mean its full page was fetched.
 - Want multiple engines for one query: use `search --providers exa,tavily,grok`, after discovering available providers. This is parallel retrieval with deterministic fusion; it does not launch the research planner.
@@ -28,11 +28,15 @@ Use `--budget-usd` for the task's spending ceiling and `--deadline` for its clou
 
 ## Obtain the result
 
-Prefer `--json` for one machine-readable result. `--max-chars` and `--fields` trim delivery, not upstream work or fees. `--stream` instead produces NDJSON progress and a final result; it is mutually exclusive with `--json`.
+Prefer `--json`: one compact result, with routine progress suppressed. Compact keeps the full answer, source IDs/URLs, query coverage, usage, gaps and failed/unsettled `attempt_issues`; snippets and page excerpts have bounds. Do not routinely add `--full`: it restores complete saved text, successful attempts, raw responses and original citation offsets. `doctor --json` is a small access check; use `doctor --verbose` or `capabilities` only when full schemas matter. `providers` gives an operation catalog, `operations PROVIDER` gives schemas.
+
+For more text from an existing result, use `soseek runs source RUN_ID SOURCE_ID --offset 0 --max-chars 4000 --json`; continue with its `next_offset`, stop when absent. This reads saved evidence without another upstream call. `field` distinguishes page content from a snippet. `output_truncated` means CLI omission; `source_content_truncated` (or source-window `upstream_truncated`) means the saved source was already incomplete. `--full` cannot recover text never saved. Only request a new `read` when the saved evidence cannot answer the question.
+
+`--max-chars` and `--fields` trim delivery, not upstream work or fees. `--fields answer,results.title,results.url` selects from the full stored result; simple source aliases such as `title,url,published_at` also work. Do not hide stderr wholesale: errors and recovery diagnostics remain useful. `--progress` explicitly enables stderr status updates. `--stream` produces NDJSON progress and a final result; it is mutually exclusive with `--json`.
 
 Long tasks can be submitted with `--detach`. Keep the returned run ID and use `soseek runs wait ID --json` or `runs get`. Local wait timeout and Ctrl-C leave the cloud task running; use `runs cancel` only when cancellation is intended. If submission acknowledgement was lost, use `soseek pending list` and `pending resume ID`; resubmitting a new query can duplicate upstream charges.
 
-Read `status`, `stop_reason`, `attempts`, `warnings`, `gaps` and `usage`, not only exit status. Exit 0 can include `partial`; `--require-all` makes partial completion nonzero. Partial results may contain useful evidence and unresolved questions. An uncertain attempt may have been billed; preserve its run ID and state rather than blindly retrying. For 429/Retry-After, respect the cooldown and report the limitation; switching keys to bypass it is not recovery. `--fresh` requests new retrieval when cached evidence is insufficient and can incur new charges.
+Read `status`, `stop_reason`, `attempt_issues` (or full `attempts`), `warnings`, `gaps` and `usage`, not only exit status. Exit 0 can include `partial`; `--require-all` makes partial completion nonzero. Partial results may contain useful evidence and unresolved questions. An uncertain attempt may have been billed; preserve its run ID and state rather than blindly retrying. For 429/Retry-After, respect the cooldown and report the limitation; switching keys to bypass it is not recovery. `--fresh` requests new retrieval when cached evidence is insufficient and can incur new charges.
 
 For native Grok search, inspect actual retrieval events and tool counts. A third-party endpoint may exceed the requested internal tool limit; `partial / upstream_limit_exceeded` preserves evidence but does not establish full completion. Grok-led research can likewise return `evidence_incomplete`; carry its stated gaps into the answer.
 

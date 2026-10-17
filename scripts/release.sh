@@ -2,7 +2,7 @@
 # Build reproducible, dependency-free release binaries. Does not publish.
 set -eu
 
-release_version=${1:-0.1.0}
+release_version=${1:-0.2.0}
 case "$release_version" in *[!A-Za-z0-9._-]*|'') echo 'Invalid version' >&2; exit 2;; esac
 release_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 release_out=${SOSEEK_RELEASE_DIR:-"$release_root/dist"}

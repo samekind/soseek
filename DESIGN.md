@@ -140,11 +140,11 @@ soseek call exa.find_similar --input request.json --json
 
 `--intent` 是可选的任务类型提示，允许值从 discovery 读取，例如 general、news、papers。宿主 Agent 可在已经理解任务的前提下填写；不填时就是 general，不能声称服务器已理解用户全部意图。时间、地域、语言和域名约束是独立的硬条件；intent 不能替代它们。未配置某 intent 的路由时明确返回 unsupported_intent，不能悄悄当普通网页查询执行。
 
-所有执行命令支持 `--budget-usd` 和服务端 `--deadline`，只能在管理员额度内收紧，不能放宽部署或身份上限。`--max-chars`、`--fields` 控制返回体积，不改变实际检索和计费范围；输出裁剪必须标明 `truncated` 并保留取回完整结果的路径。profile 声明适用 operation，search 不能选择会启动精读或模型生成的 profile；`deep` 只用于 research/answer。
+所有执行命令支持 `--budget-usd` 和服务端 `--deadline`，只能在管理员额度内收紧，不能放宽部署或身份上限。CLI 默认 compact；`--full` 返回完整存档，API 和持久化结果保持完整。`--max-chars`、`--fields` 控制返回体积，不改变实际检索和计费范围。`output_truncated` 标记 CLI 投影/裁剪，`source_content_truncated` 标记已存来源不完整；只有 CLI 省略的部分可由 `--full` 恢复。`runs source` 按 Unicode 码点分段读取已有正文或摘录，不发起新的抓取，不承诺恢复上游未返回或服务端未存下的内容。profile 声明适用 operation，search 不能选择会启动精读或模型生成的 profile；`deep` 只用于 research/answer。
 
 `call` 是已注册原生操作的受控入口，不接受任意 URL、HTTP header、路径或方法，也不能覆盖认证、base URL 和预算。全新 provider 协议仍需要适配器代码；只有已实现协议的新增线路和能力声明可以仅改配置。
 
-本机 `--json` 的 stdout 只输出一个最终 JSON 对象；进度和诊断写 stderr。`--stream` 独立输出 NDJSON 事件，不能与单对象 JSON 模式混用。终端输出清理来源中的 ANSI/控制字符；默认摘要给出引用编号、标题、URL 和简短说明，详细正文通过结果命令按需取回。
+本机 `--json` 的 stdout 只输出一个最终 JSON 对象；JSON 和非 TTY 默认不输出常规进度，`--progress` 显式开启 stderr 进度。错误与恢复信息保留。`--stream` 独立输出 NDJSON 事件，不能与单对象 JSON 模式混用。compact 保留完整 answer、来源 ID/URL、query 关联、费用未知/预留状态和失败尝试；常规成功尝试及完整引用偏移留在 `--full`。终端输出清理来源中的 ANSI/控制字符。
 
 退出码：0 = 成功或显式报告的部分成功，2 = 参数/输入问题，3 = 登录/权限问题，4 = 整体失败，5 = CLI 等待超时但云端任务仍在运行，6 = 已取消。`--require-all` 将部分成功转为非零退出。JSON 中的 `status`、warnings 和 attempts 才是完整状态，不能只看退出码。
 

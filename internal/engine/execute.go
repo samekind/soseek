@@ -14,6 +14,7 @@ import (
 
 	"github.com/samekind/soseek/internal/core"
 	"github.com/samekind/soseek/internal/fusion"
+	"github.com/samekind/soseek/internal/provider"
 )
 
 type execution struct {
@@ -605,7 +606,8 @@ func (s *execution) search(ctx context.Context, req core.Request, qid string, br
 		if parallel {
 			limit = min(limit, 8)
 		}
-		out, actual, err, attempts := s.callProvider(ctx, req, c, core.Call{Operation: "search", Query: req.Query, Limit: limit, Options: optionsFor(req.Options, c.Provider)}, qid, maxAttempts)
+		call := provider.StandardSearchCall(c, core.Call{Operation: "search", Query: req.Query, Limit: limit, Options: optionsFor(req.Options, c.Provider)})
+		out, actual, err, attempts := s.callProvider(ctx, req, c, call, qid, maxAttempts)
 		if err != nil {
 			return err, attempts
 		}
